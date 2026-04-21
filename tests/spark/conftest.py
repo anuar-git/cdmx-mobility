@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 from spark_jobs.conformance.spark_session import get_spark_session
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def spark() -> SparkSession:
     """Shared SparkSession for all Spark unit tests.
 
@@ -13,5 +13,7 @@ def spark() -> SparkSession:
     on tiny test DataFrames.
     """
     session = get_spark_session("test-cdmx-spark", local=True)
+    # Match production Dataproc timezone so timestamp conversions are unambiguous.
+    session.conf.set("spark.sql.session.timeZone", "UTC")
     yield session
     session.stop()

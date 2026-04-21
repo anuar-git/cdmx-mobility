@@ -25,7 +25,7 @@ jobs:
         run: uv python install 3.11.9
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --group spark
 
       - name: Run ruff
         run: uv run ruff check .

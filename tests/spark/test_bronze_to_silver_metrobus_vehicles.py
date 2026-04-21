@@ -298,11 +298,12 @@ def test_dwell_service_date_uses_cdmx_timezone(spark: SparkSession):
     The service_date partition should be 2026-01-14.
     """
     ts_utc = datetime(2026, 1, 15, 3, 0, 0, tzinfo=UTC)
-    ts_naive = ts_utc.replace(tzinfo=None)
-    # Two records spanning MIN_DWELL_SECONDS so the event is kept.
-    ts2_naive = datetime.fromtimestamp(ts_utc.timestamp() + MIN_DWELL_SECONDS, tz=UTC).replace(
-        tzinfo=None
-    )
+    # Use fromtimestamp (local TZ) so Spark stores the correct UTC epoch regardless
+    # of the Python process timezone. replace(tzinfo=None) on a UTC-aware datetime
+    # produces a naive datetime with UTC wall-clock values; Spark then re-adjusts it
+    # by the Python local TZ, shifting the epoch.
+    ts_naive = datetime.fromtimestamp(ts_utc.timestamp())
+    ts2_naive = datetime.fromtimestamp(ts_utc.timestamp() + MIN_DWELL_SECONDS)
 
     rows = [
         {
