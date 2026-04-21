@@ -77,7 +77,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.repository" = "assertion.repository"
   }
 
-  attribute_condition = "assertion.repository == 'anuarhage/cdmx-mobility'"
+  attribute_condition = "assertion.repository == 'anuar-git/cdmx-mobility'"
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
@@ -87,7 +87,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account_iam_member" "github_impersonation" {
   service_account_id = google_service_account.pipeline.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/anuarhage/cdmx-mobility"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/anuar-git/cdmx-mobility"
 }
 
 output "service_account_email" {
