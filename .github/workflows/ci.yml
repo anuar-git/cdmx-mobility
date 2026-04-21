@@ -30,8 +30,8 @@ jobs:
       - name: Run ruff
         run: uv run ruff check .
 
-      - name: Run black
-        run: uv run black --check .
+      - name: Run ruff format
+        run: uv run ruff format --check .
 
       - name: Run sqlfluff
         run: uv run sqlfluff lint dbt_bigquery/models --dialect bigquery
