@@ -65,7 +65,7 @@ def test_validate_csv_header_is_case_insensitive():
 
 
 def test_validate_csv_header_metro_affluence_passes():
-    data = _csv("LINEA,ESTACION,AFLUENCIA,FECHA")
+    data = _csv("LINEA,ESTACION,AFLUENCIA,FECHA,ANIO,MES")
     validate_csv_header(data, METRO_AFFLUENCE_REQUIRED, source="metro_affluence/test.csv")
 
 
