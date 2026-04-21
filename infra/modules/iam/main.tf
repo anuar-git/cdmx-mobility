@@ -53,6 +53,13 @@ resource "google_project_iam_member" "pipeline_secret_version_adder" {
   member  = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
+# Artifact Registry — allows CI to push Docker images
+resource "google_project_iam_member" "pipeline_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.pipeline.email}"
+}
+
 # Cloud Run — allows Cloud Scheduler to invoke Cloud Run Jobs via this SA
 resource "google_project_iam_member" "pipeline_run_invoker" {
   project = var.project_id
