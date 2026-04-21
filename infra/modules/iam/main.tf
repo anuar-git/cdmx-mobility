@@ -53,10 +53,10 @@ resource "google_project_iam_member" "pipeline_secret_version_adder" {
   member  = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
-# Secret Manager — list versions (needed to destroy old JWT versions after rotation)
-resource "google_project_iam_member" "pipeline_secret_viewer" {
+# Secret Manager — list + destroy versions (needed to clean up old JWT versions after rotation)
+resource "google_project_iam_member" "pipeline_secret_version_manager" {
   project = var.project_id
-  role    = "roles/secretmanager.viewer"
+  role    = "roles/secretmanager.secretVersionManager"
   member  = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
