@@ -1,0 +1,26 @@
+name: 'cdmx_mobility'
+version: '1.0.0'
+
+profile: 'cdmx_mobility'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  cdmx_mobility:
+    staging:
+      +materialized: view
+      +schema: staging_cdmx
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
+      +schema: marts_cdmx

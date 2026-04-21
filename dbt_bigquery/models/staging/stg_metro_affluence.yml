@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_metro_affluence
+    description: Cleaned and typed metro affluence data from the raw GCS external table.
+    columns:
+      - name: date
+        description: Date of the recorded entry count.
+        tests:
+          - not_null
+      - name: line
+        description: Metro line (e.g. Linea 1).
+        tests:
+          - not_null
+      - name: station
+        description: Station name.
+        tests:
+          - not_null
+      - name: entries
+        description: Number of entries recorded for this station and date.
+        tests:
+          - not_null
+      - name: ingestion_date
+        description: Date the file was landed in GCS (Hive partition).
+        tests:
+          - not_null

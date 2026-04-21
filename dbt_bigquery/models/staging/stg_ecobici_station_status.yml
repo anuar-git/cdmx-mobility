@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_ecobici_station_status
+    description: >
+      One row per station per 2-minute GBFS snapshot. Exploded from the raw
+      station_status.json envelope stored in GCS. Primary feed for bike availability analytics.
+    columns:
+      - name: ingestion_ts
+        description: UTC minute the snapshot was polled (YYYY-MM-DDTHH-MM, Hive partition).
+        tests:
+          - not_null
+      - name: feed_updated_at
+        description: Timestamp when the GBFS provider last updated the feed.
+        tests:
+          - not_null
+      - name: station_id
+        description: GBFS station identifier.
+        tests:
+          - not_null
+      - name: bikes_available
+        description: Number of bikes currently available for rental at this station.
+        tests:
+          - not_null
+      - name: docks_available
+        description: Number of empty docks available for returns at this station.
+        tests:
+          - not_null
+      - name: bikes_disabled
+        description: Number of disabled bikes at the station (not rentable).
+      - name: docks_disabled
+        description: Number of disabled docks at the station.
+      - name: is_renting
+        description: Whether the station is currently accepting bike rentals.
+      - name: is_returning
+        description: Whether the station is currently accepting bike returns.
+      - name: is_installed
+        description: Whether the station hardware is installed and operational.
+      - name: station_last_reported_at
+        description: Timestamp when the station last reported its status to the provider.

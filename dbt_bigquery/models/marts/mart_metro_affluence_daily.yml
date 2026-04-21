@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: mart_metro_affluence_daily
+    description: Daily total entries per metro station and line. Primary table for Tableau.
+    columns:
+      - name: date
+        description: Date of the entry count.
+        tests:
+          - not_null
+      - name: line
+        description: Metro line.
+        tests:
+          - not_null
+      - name: station
+        description: Station name.
+        tests:
+          - not_null
+      - name: total_entries
+        description: Aggregated entry count for the station on that date.
+        tests:
+          - not_null

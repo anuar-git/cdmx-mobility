@@ -1,0 +1,182 @@
+version: 2
+
+sources:
+  - name: raw_cdmx
+    database: cdmx-mobility-prod
+    schema: raw_cdmx
+    tables:
+      - name: metro_affluence
+        description: >
+          External table over GCS files at
+          gs://cdmx-mobility-raw/metro/affluence/ingestion_date=YYYY-MM-DD/.
+          Partitioned by ingestion_date (Hive-style).
+        columns:
+          - name: fecha
+            description: Date of the recorded entry count.
+          - name: linea
+            description: Metro line name (e.g. Linea 1).
+          - name: estacion
+            description: Station name.
+          - name: afluencia
+            description: Raw entry count for that station and date.
+          - name: ingestion_date
+            description: Hive partition column — date the file was landed in GCS.
+
+      - name: ecobici_station_status
+        description: >
+          External table over GCS GBFS station_status.json snapshots polled every 2 minutes.
+          Partitioned by ingestion_ts (STRING, format YYYY-MM-DDTHH-MM).
+          data column is native JSON containing the GBFS stations array.
+        columns:
+          - name: last_updated
+            description: Unix timestamp when the GBFS feed was last updated by the provider.
+          - name: ttl
+            description: Recommended polling interval in seconds from the GBFS feed.
+          - name: data
+            description: Raw GBFS data envelope (JSON) containing the stations array.
+          - name: ingestion_ts
+            description: Hive partition — UTC minute the snapshot was landed (YYYY-MM-DDTHH-MM).
+
+      - name: ecobici_station_information
+        description: >
+          External table over GCS GBFS station_information.json snapshots (polled daily).
+          Partitioned by ingestion_date (DATE).
+          data column is native JSON containing the GBFS stations array.
+        columns:
+          - name: last_updated
+            description: Unix timestamp when the GBFS feed was last updated by the provider.
+          - name: ttl
+            description: Recommended polling interval in seconds from the GBFS feed.
+          - name: data
+            description: Raw GBFS data envelope (JSON) containing the stations array.
+          - name: ingestion_date
+            description: Hive partition — date the snapshot was landed in GCS.
+
+      - name: ecobici_system_alerts
+        description: >
+          External table over GCS GBFS system_alerts.json snapshots polled every 2 minutes.
+          Partitioned by ingestion_ts (STRING, format YYYY-MM-DDTHH-MM).
+        columns:
+          - name: last_updated
+            description: Unix timestamp when the GBFS feed was last updated by the provider.
+          - name: ttl
+            description: Recommended polling interval in seconds.
+          - name: data
+            description: Raw GBFS data envelope (JSON) containing the alerts array.
+          - name: ingestion_ts
+            description: Hive partition — UTC minute the snapshot was landed (YYYY-MM-DDTHH-MM).
+
+      # ── Metrobús / SEMOVI GTFS static ────────────────────────────────────────
+
+      - name: metrobus_stops
+        description: >
+          GTFS stops.txt from the unified SEMOVI CDMX static feed (covers Metrobús, Metro, etc.).
+          External CSV table partitioned by ingestion_date (DATE).
+        columns:
+          - name: stop_id
+            description: Unique stop identifier.
+          - name: stop_code
+            description: Short public-facing code (may be null).
+          - name: stop_name
+            description: Human-readable stop name.
+          - name: stop_lat
+            description: WGS-84 latitude.
+          - name: stop_lon
+            description: WGS-84 longitude.
+          - name: location_type
+            description: 0=stop, 1=station, 2=entrance (GTFS enum).
+          - name: parent_station
+            description: stop_id of the parent station (for entrances/platforms).
+          - name: ingestion_date
+            description: Hive partition — date the ZIP was downloaded.
+
+      - name: metrobus_routes
+        description: >
+          GTFS routes.txt from the unified SEMOVI CDMX static feed.
+          External CSV table partitioned by ingestion_date (DATE).
+        columns:
+          - name: route_id
+            description: Unique route identifier.
+          - name: route_short_name
+            description: Short public name (e.g. "1", "2", "Cablebús L1").
+          - name: route_long_name
+            description: Full descriptive name of the route.
+          - name: route_type
+            description: GTFS mode enum (3=bus, 5=cable car, etc.).
+          - name: route_color
+            description: Hex colour for map rendering (without #).
+          - name: route_text_color
+            description: Hex colour for text on the route colour background.
+          - name: ingestion_date
+            description: Hive partition — date the ZIP was downloaded.
+
+      - name: metrobus_trips
+        description: >
+          GTFS trips.txt from the unified SEMOVI CDMX static feed.
+          External CSV table partitioned by ingestion_date (DATE).
+        columns:
+          - name: route_id
+          - name: service_id
+          - name: trip_id
+          - name: trip_headsign
+          - name: direction_id
+          - name: shape_id
+          - name: ingestion_date
+
+      - name: metrobus_stop_times
+        description: >
+          GTFS stop_times.txt — scheduled arrivals/departures for every stop on every trip.
+          Largest feed (~hundreds of thousands of rows). External CSV table partitioned by ingestion_date.
+        columns:
+          - name: trip_id
+          - name: arrival_time
+            description: HH:MM:SS — may exceed 24:00:00 for trips past midnight.
+          - name: departure_time
+          - name: stop_id
+          - name: stop_sequence
+          - name: ingestion_date
+
+      - name: metrobus_calendar
+        description: >
+          GTFS calendar.txt — service schedule by day-of-week.
+          External CSV table partitioned by ingestion_date (DATE).
+        columns:
+          - name: service_id
+          - name: monday
+          - name: tuesday
+          - name: wednesday
+          - name: thursday
+          - name: friday
+          - name: saturday
+          - name: sunday
+          - name: start_date
+          - name: end_date
+          - name: ingestion_date
+
+      - name: metrobus_shapes
+        description: >
+          GTFS shapes.txt — route polyline geometry as ordered lat/lon sequences.
+          External CSV table partitioned by ingestion_date (DATE).
+        columns:
+          - name: shape_id
+          - name: shape_pt_lat
+          - name: shape_pt_lon
+          - name: shape_pt_sequence
+          - name: ingestion_date
+
+      # ── Metrobús GTFS-Realtime ────────────────────────────────────────────────
+
+      - name: metrobus_vehicle_positions
+        description: >
+          GTFS-RT vehicle positions polled every 30 seconds (~2,880 NDJSON snapshots/day).
+          External NDJSON table partitioned by ingestion_date (DATE).
+          The vehicle column holds the full VehiclePosition proto serialised as JSON.
+        columns:
+          - name: id
+            description: GTFS-RT FeedEntity ID.
+          - name: vehicle
+            description: VehiclePosition proto as JSON (trip, position, current_status, vehicle descriptor).
+          - name: _snapshot_ts
+            description: UTC wall-clock TIMESTAMP of the poll that produced this record.
+          - name: ingestion_date
+            description: Hive partition — UTC date of the poll.

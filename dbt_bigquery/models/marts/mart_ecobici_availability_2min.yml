@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: mart_ecobici_availability_2min
+    description: >
+      Minute-level bike availability across all ~480 EcoBici stations, enriched with
+      static station metadata. One row per station per 2-minute polling snapshot.
+      Primary table for Tableau dashboards and availability analytics.
+    columns:
+      - name: ingestion_ts
+        description: UTC minute the snapshot was polled (YYYY-MM-DDTHH-MM).
+        tests:
+          - not_null
+      - name: feed_updated_at
+        description: Timestamp when the GBFS provider last updated the feed.
+        tests:
+          - not_null
+      - name: station_id
+        description: GBFS station identifier.
+        tests:
+          - not_null
+      - name: station_name
+        description: Human-readable station name from station_information.
+      - name: short_name
+        description: Short station code or abbreviation.
+      - name: lat
+        description: Station latitude in decimal degrees.
+      - name: lon
+        description: Station longitude in decimal degrees.
+      - name: capacity
+        description: Total dock capacity of the station.
+      - name: bikes_available
+        description: Number of bikes available for rental at snapshot time.
+        tests:
+          - not_null
+      - name: docks_available
+        description: Number of empty docks available for returns at snapshot time.
+        tests:
+          - not_null
+      - name: bikes_disabled
+        description: Number of disabled (non-rentable) bikes at snapshot time.
+      - name: docks_disabled
+        description: Number of disabled docks at snapshot time.
+      - name: is_renting
+        description: Whether the station was accepting rentals at snapshot time.
+      - name: is_returning
+        description: Whether the station was accepting returns at snapshot time.
+      - name: is_installed
+        description: Whether the station hardware was operational at snapshot time.
+      - name: station_last_reported_at
+        description: Timestamp when the station device last reported to the provider.
+      - name: availability_ratio
+        description: bikes_available / capacity — proportion of bikes available (0.0–1.0).
