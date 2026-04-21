@@ -1,0 +1,9 @@
+project_id            = "cdmx-mobility-prod-XXXXXX"
+region                = "us-central1"
+bq_location           = "US"
+data_bucket_name      = "cdmx-mobility-data"
+ingestor_image        = "us-central1-docker.pkg.dev/YOUR_PROJECT/ingestor/ingestor:latest"
+ecobici_gbfs_base_url = "https://gbfs.PROVIDER.com/gbfs/es"
+
+metrobus_gtfs_static_dataset_id        = "gtfs"
+metrobus_gtfs_rt_vehicle_positions_url = "https://YOUR_SEMOVI_GTFS_RT_ENDPOINT/VehiclePositions.pb"
