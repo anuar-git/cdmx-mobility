@@ -6,6 +6,7 @@ variable "metrobus_email_job_name" { type = string }
 variable "service_account_email" { type = string }
 
 variable "weather_ingest_job_name" { type = string }
+variable "metro_ingest_job_name" { type = string }
 
 variable "spark_workflow_schedules" {
   type = map(object({
@@ -89,6 +90,27 @@ resource "google_cloud_scheduler_job" "weather_ingest" {
   http_target {
     http_method = "POST"
     uri         = "https://run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${var.weather_ingest_job_name}:run"
+
+    oauth_token {
+      service_account_email = var.service_account_email
+    }
+  }
+
+  retry_config {
+    retry_count = 1
+  }
+}
+
+resource "google_cloud_scheduler_job" "metro_ingest" {
+  name      = "metro-ingest-daily"
+  project   = var.project_id
+  region    = var.region
+  schedule  = "0 6 * * *" # 06:00 AM Mexico City — after CKAN daily publish window
+  time_zone = "America/Mexico_City"
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${var.metro_ingest_job_name}:run"
 
     oauth_token {
       service_account_email = var.service_account_email
