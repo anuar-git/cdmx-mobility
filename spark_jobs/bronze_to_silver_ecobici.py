@@ -145,7 +145,12 @@ def _transform_station_master(spark: SparkSession, input_path: str) -> DataFrame
 
 
 def _silver_stats(output_path: str) -> tuple[int, int]:
-    """Return (file_count, byte_count) for the just-written Silver prefix."""
+    """Return (file_count, byte_count) for the just-written Silver prefix.
+
+    Returns (0, 0) for local paths (--local smoke-test mode).
+    """
+    if not output_path.startswith("gs://"):
+        return 0, 0
     bucket_name, prefix = output_path.replace("gs://", "").split("/", 1)
     client = gcs.Client()
     blobs = list(client.list_blobs(bucket_name, prefix=prefix))
@@ -154,28 +159,30 @@ def _silver_stats(output_path: str) -> tuple[int, int]:
 
 def run_job(
     spark: SparkSession,
-    status_input: str,
+    input_path: str,
     info_input: str,
-    state_changes_output: str,
-    station_master_output: str,
+    output_path: str,
     gcp_project_id: str,
 ) -> RunResult:
+    base = output_path.rstrip("/")
+    state_changes_output = f"{base}/state_changes/"
+    station_master_output = f"{base}/station_master/"
+
     result = RunResult(source="spark_ecobici_silver")
     bq_logger = IngestionLogger(project_id=gcp_project_id)
 
     try:
         # --- State changes ---
-        df = _transform_state_changes(spark, status_input)
+        df = _transform_state_changes(spark, input_path)
 
         # Cache before count so the window DAG is executed once, not twice.
         df.cache()
         output_rows = df.count()
 
         # Count raw exploded rows for compression-ratio logging.
-        # Done after the state_changes count to reuse the cached stage above.
         raw_exploded = (
             spark.read.option("multiline", "true")
-            .json(status_input)
+            .json(input_path)
             .select(explode(col("data.stations")).alias("_s"))
             .count()
         )
@@ -188,7 +195,7 @@ def run_job(
         )
 
         df = df.repartition(col("service_date"))
-        (df.write.partitionBy("service_date").mode("overwrite").parquet(state_changes_output))
+        df.write.partitionBy("service_date").mode("overwrite").parquet(state_changes_output)
         df.unpersist()
 
         sc_files, sc_bytes = _silver_stats(state_changes_output)
@@ -216,7 +223,7 @@ def run_job(
 
 @click.command()
 @click.option(
-    "--status-input",
+    "--input-path",
     default=DEFAULT_STATUS_INPUT,
     show_default=True,
     help="GCS glob for station_status JSON snapshots",
@@ -228,16 +235,10 @@ def run_job(
     help="GCS glob for station_information JSON snapshots",
 )
 @click.option(
-    "--state-changes-output",
-    default=DEFAULT_STATE_CHANGES_OUTPUT,
+    "--output-path",
+    default=f"gs://{_BUCKET}/silver/ecobici/",
     show_default=True,
-    help="GCS or local path for Silver state_changes Parquet output",
-)
-@click.option(
-    "--station-master-output",
-    default=DEFAULT_STATION_MASTER_OUTPUT,
-    show_default=True,
-    help="GCS or local path for Silver station_master Parquet output",
+    help="GCS or local base path; state_changes/ and station_master/ are appended",
 )
 @click.option(
     "--local",
@@ -245,24 +246,16 @@ def run_job(
     help="Run with local[2] master for smoke-testing (no cluster needed)",
 )
 def run(
-    status_input: str,
+    input_path: str,
     info_input: str,
-    state_changes_output: str,
-    station_master_output: str,
+    output_path: str,
     local: bool,
 ) -> None:
     """Transform EcoBici station_status snapshots to Silver state-change Parquet."""
     settings = Settings()
     spark = get_spark_session("cdmx-ecobici-silver", local=local)
     try:
-        run_job(
-            spark,
-            status_input,
-            info_input,
-            state_changes_output,
-            station_master_output,
-            settings.gcp_project_id,
-        )
+        run_job(spark, input_path, info_input, output_path, settings.gcp_project_id)
     finally:
         spark.stop()
 

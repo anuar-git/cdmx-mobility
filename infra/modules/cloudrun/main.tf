@@ -155,8 +155,8 @@ resource "google_cloud_run_v2_service" "metrobus_gtfs_rt_daemon" {
 
       resources {
         limits = {
-          cpu    = "0.5"
-          memory = "256Mi"
+          cpu    = "1"
+          memory = "512Mi"
         }
       }
 
@@ -326,42 +326,6 @@ resource "google_cloud_run_v2_job" "weather_ingest" {
   }
 }
 
-resource "google_cloud_run_v2_job" "metro_ingest" {
-  name                = "metro-ingest"
-  location            = var.region
-  project             = var.project_id
-  deletion_protection = false
-
-  template {
-    template {
-      service_account = var.service_account_email
-      max_retries     = 1
-
-      containers {
-        image   = var.image
-        command = ["uv", "run", "python", "main.py", "ingest-metro-affluence"]
-
-        env {
-          name  = "CDMX_GCP_PROJECT_ID"
-          value = var.project_id
-        }
-
-        env {
-          name  = "CDMX_RAW_BUCKET_NAME"
-          value = var.raw_bucket_name
-        }
-
-        resources {
-          limits = {
-            cpu    = "1"
-            memory = "512Mi"
-          }
-        }
-      }
-    }
-  }
-}
-
 resource "google_cloud_run_v2_service_iam_member" "inbound_public" {
   project  = var.project_id
   location = var.region
@@ -417,10 +381,6 @@ output "metrobus_email_job_name" {
 
 output "weather_ingest_job_name" {
   value = google_cloud_run_v2_job.weather_ingest.name
-}
-
-output "metro_ingest_job_name" {
-  value = google_cloud_run_v2_job.metro_ingest.name
 }
 
 output "metrobus_inbound_url" {

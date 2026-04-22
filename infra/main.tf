@@ -51,7 +51,6 @@ module "scheduler" {
   metrobus_static_job_name = module.cloudrun.metrobus_static_job_name
   metrobus_email_job_name  = module.cloudrun.metrobus_email_job_name
   weather_ingest_job_name  = module.cloudrun.weather_ingest_job_name
-  metro_ingest_job_name    = module.cloudrun.metro_ingest_job_name
   service_account_email    = module.iam.service_account_email
 
   spark_workflow_schedules = {

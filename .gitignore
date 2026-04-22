@@ -209,4 +209,4 @@ __marimo__/
 #Infra
 infra/terraform.tfvars
 infra/terraform.tvars
-infra/.terraform/
+**/.terraform/

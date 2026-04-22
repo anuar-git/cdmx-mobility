@@ -270,7 +270,12 @@ def _transform(spark: SparkSession, input_path: str) -> DataFrame:
 
 
 def _silver_stats(output_path: str) -> tuple[int, int]:
-    """Return (file_count, byte_count) for the just-written Silver prefix."""
+    """Return (file_count, byte_count) for the just-written Silver prefix.
+
+    Returns (0, 0) for local paths (--local smoke-test mode).
+    """
+    if not output_path.startswith("gs://"):
+        return 0, 0
     bucket_name, prefix = output_path.replace("gs://", "").split("/", 1)
     client = gcs.Client()
     blobs = list(client.list_blobs(bucket_name, prefix=prefix))

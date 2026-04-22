@@ -218,7 +218,12 @@ def _compute_dwell_events(snapped: DataFrame) -> DataFrame:
 
 
 def _silver_stats(output_path: str) -> tuple[int, int]:
-    """Return (file_count, byte_count) for the just-written Silver prefix."""
+    """Return (file_count, byte_count) for the just-written Silver prefix.
+
+    Returns (0, 0) for local paths (--local smoke-test mode).
+    """
+    if not output_path.startswith("gs://"):
+        return 0, 0
     bucket_name, prefix = output_path.replace("gs://", "").split("/", 1)
     client = gcs.Client()
     blobs = list(client.list_blobs(bucket_name, prefix=prefix))
@@ -227,7 +232,7 @@ def _silver_stats(output_path: str) -> tuple[int, int]:
 
 def run_job(
     spark: SparkSession,
-    positions_input: str,
+    input_path: str,
     stops_input: str,
     output_path: str,
     gcp_project_id: str,
@@ -236,7 +241,7 @@ def run_job(
     bq_logger = IngestionLogger(project_id=gcp_project_id)
 
     try:
-        positions = _load_positions(spark, positions_input)
+        positions = _load_positions(spark, input_path)
 
         stops = _load_stops(spark, stops_input)
         # Pass only the columns needed for snap; stop_lat/stop_lon are dropped
@@ -282,7 +287,7 @@ def run_job(
 
 @click.command()
 @click.option(
-    "--positions-input",
+    "--input-path",
     default=DEFAULT_POSITIONS_INPUT,
     show_default=True,
     help="GCS glob for vehicle position NDJSON files",
@@ -305,7 +310,7 @@ def run_job(
     help="Run with local[2] master for smoke-testing (no cluster needed)",
 )
 def run(
-    positions_input: str,
+    input_path: str,
     stops_input: str,
     output_path: str,
     local: bool,
@@ -314,7 +319,7 @@ def run(
     settings = Settings()
     spark = get_spark_session("cdmx-metrobus-stop-events-silver", local=local)
     try:
-        run_job(spark, positions_input, stops_input, output_path, settings.gcp_project_id)
+        run_job(spark, input_path, stops_input, output_path, settings.gcp_project_id)
     finally:
         spark.stop()
 

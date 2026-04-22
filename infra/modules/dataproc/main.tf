@@ -85,11 +85,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
     step_id = "spark-job"
     pyspark_job {
       main_python_file_uri = each.value
-      # conformance.zip is built and uploaded by CI in Step 9:
-      #   cd spark_jobs && zip -r conformance.zip conformance/
-      #   gsutil cp conformance.zip gs://${bucket}/code/spark_jobs/conformance.zip
-      # Uncomment once the conformance package exists:
-      # python_file_uris = ["gs://${var.bucket_name}/code/spark_jobs/conformance.zip"]
+      python_file_uris     = ["gs://${var.bucket_name}/code/spark_jobs/conformance.zip"]
     }
   }
 }

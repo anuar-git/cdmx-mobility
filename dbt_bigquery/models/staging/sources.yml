@@ -1,6 +1,107 @@
 version: 2
 
 sources:
+  - name: silver_cdmx
+    database: cdmx-mobility-prod
+    schema: silver_cdmx
+    description: >
+      Silver-layer external tables over Parquet written by Spark jobs.
+      Partitioned by service_date (DATE, CDMX-local wall-clock day).
+    tables:
+      - name: ecobici_state_changes
+        description: >
+          Deduplicated EcoBici station state changes. One row per
+          (snapshot_ts, station_id) where at least one field changed since the prior
+          snapshot. Partitioned by service_date.
+        columns:
+          - name: snapshot_ts
+            description: UTC timestamp of the GBFS snapshot where the change was first seen.
+          - name: station_id
+            description: EcoBici station identifier.
+          - name: num_bikes_available
+          - name: num_docks_available
+          - name: is_renting
+            description: 1=accepting returns, 0=not.
+          - name: is_returning
+            description: 1=accepting returns, 0=not.
+          - name: last_reported
+            description: Per-station epoch timestamp when the station last reported to the provider.
+          - name: service_date
+            description: CDMX-local date (UTC-6) of snapshot_ts. Hive partition column.
+
+      - name: ecobici_station_master
+        description: >
+          Latest station_information snapshot — one row per station. No partitioning.
+          Refreshed on every Spark run.
+        columns:
+          - name: station_id
+          - name: name
+          - name: lat
+          - name: lon
+          - name: capacity
+
+      - name: metro_affluence
+        description: >
+          Daily metro entry counts per (service_date, linea, station_canonical).
+          Partitioned by service_date.
+        columns:
+          - name: service_date
+            description: Date of the recorded entry count. Hive partition column.
+          - name: linea
+            description: Metro line identifier (e.g. L1).
+          - name: station_raw
+            description: Station name as it appeared in the source CSV.
+          - name: station_canonical
+            description: Normalised station name after mojibake fix and variant lookup.
+          - name: daily_entries
+            description: Total entries recorded for this station on this date.
+
+      - name: metrobus_stop_events
+        description: >
+          Metrobús vehicle dwell events at stops. One row per continuous dwell session
+          (vehicle at stop with no gap > SESSION_GAP_SECONDS). Partitioned by
+          service_date and route_id.
+        columns:
+          - name: vehicle_id
+          - name: stop_id
+          - name: stop_name
+          - name: route_id
+          - name: trip_id
+          - name: stop_sequence
+          - name: dwell_start_ts
+          - name: dwell_end_ts
+          - name: dwell_seconds
+          - name: service_date
+            description: CDMX-local date of dwell_start_ts. Hive partition column.
+
+      - name: weather_hourly_fact
+        description: >
+          Hourly weather observations and derived comfort features for CDMX coordinates.
+          Partitioned by service_date.
+        columns:
+          - name: coordinate_id
+            description: Identifier for the observation coordinate (lat_lon string).
+          - name: obs_time
+            description: Observation timestamp (hourly, local time string from Open-Meteo).
+          - name: temperature_2m
+          - name: precipitation
+          - name: windspeed_10m
+          - name: relativehumidity_2m
+          - name: avg_temperature_2m
+            description: 24h rolling average temperature.
+          - name: avg_precipitation
+          - name: avg_windspeed_10m
+          - name: avg_relativehumidity_2m
+          - name: heat_index
+          - name: precipitation_flag
+            description: Boolean — true if precipitation > 0.1mm.
+          - name: wind_category
+            description: Beaufort-scale category string.
+          - name: comfort_score
+            description: Composite 0-100 comfort index.
+          - name: service_date
+            description: CDMX-local date. Hive partition column.
+
   - name: raw_cdmx
     database: cdmx-mobility-prod
     schema: raw_cdmx

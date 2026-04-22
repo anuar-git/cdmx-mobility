@@ -5,6 +5,7 @@ variable "raw_bucket_name" { type = string }
 locals {
   datasets = {
     raw_cdmx     = "Raw landing zone — external tables over GCS Parquet/JSON"
+    silver_cdmx  = "Silver — cleaned Parquet written by Spark jobs"
     staging_cdmx = "Staging — dbt staging models, type-cast and renamed"
     marts_cdmx   = "Marts — dimensional model, what Tableau queries"
     meta_cdmx    = "Pipeline metadata — ingestion logs, dbt run results, GE results"
@@ -258,6 +259,150 @@ resource "google_bigquery_table" "ingestion_log" {
     { name = "status", type = "STRING", mode = "REQUIRED" },
     { name = "error_message", type = "STRING", mode = "NULLABLE" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# ── Silver external tables (Parquet written by Spark jobs) ───────────────────
+# autodetect = false + explicit schema: BQ does not probe files at creation
+# time, so apply succeeds before the first Spark run populates the paths.
+# CUSTOM hive partitioning encodes the partition column type in the prefix
+# template, which also does not require files to exist.
+
+resource "google_bigquery_table" "silver_ecobici_state_changes" {
+  dataset_id          = google_bigquery_dataset.datasets["silver_cdmx"].dataset_id
+  table_id            = "ecobici_state_changes"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/ecobici/state_changes/*"]
+    source_format = "PARQUET"
+    autodetect    = false
+
+    hive_partitioning_options {
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/ecobici/state_changes/{service_date:DATE}"
+    }
+  }
+
+  schema = jsonencode([
+    { name = "snapshot_ts", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "station_id", type = "STRING", mode = "NULLABLE" },
+    { name = "num_bikes_available", type = "INTEGER", mode = "NULLABLE" },
+    { name = "num_docks_available", type = "INTEGER", mode = "NULLABLE" },
+    { name = "is_renting", type = "INTEGER", mode = "NULLABLE" },
+    { name = "is_returning", type = "INTEGER", mode = "NULLABLE" },
+    { name = "last_reported", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "silver_ecobici_station_master" {
+  dataset_id          = google_bigquery_dataset.datasets["silver_cdmx"].dataset_id
+  table_id            = "ecobici_station_master"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/ecobici/station_master/*"]
+    source_format = "PARQUET"
+    autodetect    = false
+  }
+
+  schema = jsonencode([
+    { name = "station_id", type = "STRING", mode = "NULLABLE" },
+    { name = "name", type = "STRING", mode = "NULLABLE" },
+    { name = "lat", type = "FLOAT", mode = "NULLABLE" },
+    { name = "lon", type = "FLOAT", mode = "NULLABLE" },
+    { name = "capacity", type = "INTEGER", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "silver_metro_affluence" {
+  dataset_id          = google_bigquery_dataset.datasets["silver_cdmx"].dataset_id
+  table_id            = "metro_affluence"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/metro/affluence/*"]
+    source_format = "PARQUET"
+    autodetect    = false
+
+    hive_partitioning_options {
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/metro/affluence/{service_date:DATE}"
+    }
+  }
+
+  schema = jsonencode([
+    { name = "linea", type = "STRING", mode = "NULLABLE" },
+    { name = "station_raw", type = "STRING", mode = "NULLABLE" },
+    { name = "station_canonical", type = "STRING", mode = "NULLABLE" },
+    { name = "daily_entries", type = "INTEGER", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "silver_metrobus_stop_events" {
+  dataset_id          = google_bigquery_dataset.datasets["silver_cdmx"].dataset_id
+  table_id            = "metrobus_stop_events"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/metrobus/stop_events/*"]
+    source_format = "PARQUET"
+    autodetect    = false
+
+    hive_partitioning_options {
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/metrobus/stop_events/{service_date:DATE}/{route_id:STRING}"
+    }
+  }
+
+  schema = jsonencode([
+    { name = "vehicle_id", type = "STRING", mode = "NULLABLE" },
+    { name = "stop_id", type = "STRING", mode = "NULLABLE" },
+    { name = "stop_name", type = "STRING", mode = "NULLABLE" },
+    { name = "trip_id", type = "STRING", mode = "NULLABLE" },
+    { name = "stop_sequence", type = "INTEGER", mode = "NULLABLE" },
+    { name = "dwell_start_ts", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "dwell_end_ts", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "dwell_seconds", type = "INTEGER", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "silver_weather_hourly_fact" {
+  dataset_id          = google_bigquery_dataset.datasets["silver_cdmx"].dataset_id
+  table_id            = "weather_hourly_fact"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/weather/hourly_fact/*"]
+    source_format = "PARQUET"
+    autodetect    = false
+
+    hive_partitioning_options {
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/weather/hourly_fact/{service_date:DATE}"
+    }
+  }
+
+  schema = jsonencode([
+    { name = "coordinate_id", type = "STRING", mode = "NULLABLE" },
+    { name = "obs_time", type = "STRING", mode = "NULLABLE" },
+    { name = "temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "avg_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "avg_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "avg_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "avg_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "heat_index", type = "FLOAT", mode = "NULLABLE" },
+    { name = "precipitation_flag", type = "BOOLEAN", mode = "NULLABLE" },
+    { name = "wind_category", type = "STRING", mode = "NULLABLE" },
+    { name = "comfort_score", type = "FLOAT", mode = "NULLABLE" },
   ])
 }
 

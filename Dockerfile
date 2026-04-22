@@ -13,4 +13,9 @@ RUN uv sync --no-dev --frozen
 COPY ingestion/ ingestion/
 COPY main.py ./
 
+# UV_NO_SYNC: tell `uv run` to use the venv as-is without re-syncing.
+# Without this, `uv run` syncs to the full lockfile (including dev/spark groups)
+# on every container start, downloading and installing lint/test tools at runtime.
+ENV UV_NO_SYNC=1
+
 ENTRYPOINT ["uv", "run", "python", "main.py"]
