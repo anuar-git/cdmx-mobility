@@ -30,18 +30,6 @@ variable "ecobici_gbfs_base_url" {
   default     = ""
 }
 
-variable "metrobus_gtfs_static_dataset_id" {
-  type        = string
-  description = "CKAN dataset slug for the SEMOVI unified CDMX GTFS static ZIP (datos.cdmx.gob.mx)"
-  default     = "gtfs"
-}
-
-variable "metrobus_gtfs_rt_vehicle_positions_url" {
-  type        = string
-  description = "GTFS-RT vehicle positions protobuf endpoint URL; obtain from SEMOVI/Metrobús operations"
-  default     = ""
-}
-
 variable "metrobus_inbound_webhook_secret" {
   type        = string
   sensitive   = true

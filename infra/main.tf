@@ -30,17 +30,15 @@ module "secrets" {
 }
 
 module "cloudrun" {
-  source                                 = "./modules/cloudrun"
-  project_id                             = var.project_id
-  region                                 = var.region
-  service_account_email                  = module.iam.service_account_email
-  image                                  = var.ingestor_image
-  raw_bucket_name                        = module.storage.bucket_name
-  gbfs_base_url                          = var.ecobici_gbfs_base_url
-  metrobus_gtfs_static_dataset_id        = var.metrobus_gtfs_static_dataset_id
-  metrobus_gtfs_rt_vehicle_positions_url = var.metrobus_gtfs_rt_vehicle_positions_url
-  metrobus_inbound_webhook_secret        = var.metrobus_inbound_webhook_secret
-  metrobus_sinoptico_recipient_email     = var.metrobus_sinoptico_recipient_email
+  source                             = "./modules/cloudrun"
+  project_id                         = var.project_id
+  region                             = var.region
+  service_account_email              = module.iam.service_account_email
+  image                              = var.ingestor_image
+  raw_bucket_name                    = module.storage.bucket_name
+  gbfs_base_url                      = var.ecobici_gbfs_base_url
+  metrobus_inbound_webhook_secret    = var.metrobus_inbound_webhook_secret
+  metrobus_sinoptico_recipient_email = var.metrobus_sinoptico_recipient_email
 }
 
 module "scheduler" {

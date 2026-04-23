@@ -86,12 +86,15 @@ async def handle_inbound(secret: str, request: Request) -> JSONResponse:
 
     extractor = _LinkExtractor()
     extractor.feed(html_body)
-    proto_urls = [url for url in extractor.links if ".proto" in url.lower()]
-    log.info("proto_links_found", count=len(proto_urls), urls=proto_urls)
+    log.info("all_links_found", count=len(extractor.links), urls=extractor.links)
+    target_urls = [
+        url for url in extractor.links if ".proto" in url.lower() or ".zip" in url.lower()
+    ]
+    log.info("target_links_found", count=len(target_urls), urls=target_urls)
 
-    if not proto_urls:
-        log.warning("no_proto_links_in_email")
-        return JSONResponse({"status": "ok", "skipped": "no proto links"})
+    if not target_urls:
+        log.warning("no_target_links_in_email")
+        return JSONResponse({"status": "ok", "skipped": "no target links"})
 
     now = datetime.datetime.utcnow()
     today = now.strftime("%Y-%m-%d")
@@ -105,7 +108,7 @@ async def handle_inbound(secret: str, request: Request) -> JSONResponse:
         entity_count = 0
 
         with httpx.Client(timeout=_settings.http_timeout_seconds, follow_redirects=True) as client:
-            for url in proto_urls:
+            for url in target_urls:
                 match = re.search(r"/([^/?]+\.proto)", unquote(url), re.IGNORECASE)
                 fname = match.group(1) if match else url.split("/")[-1].split("?")[0]
                 resp = client.get(url)
@@ -134,12 +137,15 @@ async def handle_inbound(secret: str, request: Request) -> JSONResponse:
                     log.info("rt_parsed", entities=entity_count, snapshot_ts=snapshot_ts)
                 else:
                     static_path = f"metrobus/gtfs_static_email/ingestion_date={today}/{fname}"
-                    _uploader.upload(
-                        raw_bytes, static_path, content_type="application/octet-stream"
-                    )
-                    total_bytes += len(raw_bytes)
-                    file_count += 1
-                    log.info("static_archived", filename=fname, bytes=len(raw_bytes))
+                    if _uploader.exists(static_path):
+                        log.info("static_already_archived_today", filename=fname)
+                    else:
+                        _uploader.upload(
+                            raw_bytes, static_path, content_type="application/octet-stream"
+                        )
+                        total_bytes += len(raw_bytes)
+                        file_count += 1
+                        log.info("static_archived", filename=fname, bytes=len(raw_bytes))
 
         result.file_count = file_count
         result.byte_count = total_bytes

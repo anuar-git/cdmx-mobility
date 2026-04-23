@@ -3,30 +3,27 @@ import io
 import zipfile
 
 import structlog
+from google.cloud import storage
 
 from ingestion.bq_logger import IngestionLogger, RunResult
-from ingestion.ckan_client import CKANClient
 from ingestion.config import Settings
 from ingestion.gcs_uploader import GCSUploader
 from ingestion.schema_validator import GTFS_STATIC_REQUIRED, validate_csv_header
 
 log = structlog.get_logger()
 
-# Standard GTFS files carried by the SEMOVI feed; others (agency.txt, feed_info.txt, …) skipped
 _EXPECTED_FEEDS = {"stops", "routes", "trips", "stop_times", "calendar", "shapes"}
 
 
-def _find_zip_resource(resources: list[dict]) -> dict:
-    """Return the most-recently-modified ZIP resource from a CKAN resource list."""
-    candidates = [
-        r
-        for r in resources
-        if r.get("format", "").upper() in {"ZIP", "GTFS"}
-        or r.get("url", "").lower().endswith(".zip")
-    ]
-    if not candidates:
-        raise RuntimeError(f"No ZIP resource found among {len(resources)} CKAN resources")
-    return max(candidates, key=lambda r: r.get("last_modified", ""))
+def _latest_static_zip(bucket_name: str) -> tuple[str, bytes]:
+    """Return (blob_name, bytes) for the most recent static GTFS ZIP archived by the webhook."""
+    client = storage.Client()
+    blobs = list(client.list_blobs(bucket_name, prefix="metrobus/gtfs_static_email/"))
+    if not blobs:
+        raise RuntimeError("No static GTFS ZIP found in GCS — webhook may not have run yet")
+    latest = max(blobs, key=lambda b: b.updated)
+    log.info("using_static_zip", blob=latest.name, updated=latest.updated.isoformat())
+    return latest.name, latest.download_as_bytes()
 
 
 def run(settings: Settings) -> None:
@@ -34,20 +31,10 @@ def run(settings: Settings) -> None:
     result = RunResult(source="metrobus_gtfs_static")
 
     try:
-        client = CKANClient(
-            base_url=settings.metro_ckan_base_url,
-            timeout=settings.http_timeout_seconds,
-            max_retries=settings.http_max_retries,
-        )
         uploader = GCSUploader(bucket_name=settings.raw_bucket_name)
         today = datetime.date.today().isoformat()
 
-        log.info("fetching_gtfs_resources", dataset=settings.metrobus_gtfs_static_dataset_id)
-        resources = client.get_resources(settings.metrobus_gtfs_static_dataset_id)
-        zip_resource = _find_zip_resource(resources)
-
-        log.info("downloading_gtfs_zip", url=zip_resource["url"])
-        zip_bytes = client.download_resource(zip_resource["url"])
+        _, zip_bytes = _latest_static_zip(settings.raw_bucket_name)
 
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             for entry in zf.namelist():

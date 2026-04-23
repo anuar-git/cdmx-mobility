@@ -15,12 +15,7 @@ class Settings(BaseSettings):
     ecobici_api_key: str = ""
     ecobici_poll_feeds: list[str] = ["station_information", "station_status", "system_alerts"]
 
-    # Metrobús GTFS static — unified SEMOVI CDMX feed (covers Metrobús, Metro, Tren Ligero, …)
-    # CKAN dataset slug on datos.cdmx.gob.mx; shares metro_ckan_base_url
-    metrobus_gtfs_static_dataset_id: str = "gtfs"
-
-    # Metrobús GTFS-Realtime vehicle positions
-    # URL not publicly listed; obtain from SEMOVI/Metrobús operations and set via env var
+    # Metrobús GTFS-Realtime — dormant; gtfs_rt.py retained in repo pending a direct SEMOVI URL
     metrobus_gtfs_rt_vehicle_positions_url: str = ""
     metrobus_gtfs_rt_poll_interval_seconds: int = 30
 

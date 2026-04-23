@@ -10,3 +10,6 @@ class GCSUploader:
         blob = self._bucket.blob(gcs_path)
         blob.upload_from_string(data, content_type=content_type)
         return f"gs://{self._bucket.name}/{gcs_path}"
+
+    def exists(self, gcs_path: str) -> bool:
+        return self._bucket.blob(gcs_path).exists()
