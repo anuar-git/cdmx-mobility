@@ -109,8 +109,8 @@ async def handle_inbound(secret: str, request: Request) -> JSONResponse:
 
         with httpx.Client(timeout=_settings.http_timeout_seconds, follow_redirects=True) as client:
             for url in target_urls:
-                match = re.search(r"/([^/?]+\.proto)", unquote(url), re.IGNORECASE)
-                fname = match.group(1) if match else url.split("/")[-1].split("?")[0]
+                match = re.search(r"/([^/?]+\.(proto|zip))", unquote(url), re.IGNORECASE)
+                fname = match.group(1) if match else unquote(url).split("/")[-1].split("?")[0]
                 resp = client.get(url)
                 resp.raise_for_status()
                 raw_bytes = resp.content
