@@ -1,5 +1,6 @@
 import datetime
 
+import httpx
 import structlog
 
 from ingestion.bq_logger import IngestionLogger, RunResult
@@ -50,6 +51,14 @@ def run(settings: Settings) -> None:
             result.file_count += 1
             result.byte_count += len(data)
             result.row_count = (result.row_count or 0) + max(0, len(data.splitlines()) - 1)
+
+    except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+        # datos.cdmx.gob.mx is intermittently unreachable (server-side downtime).
+        # The dataset updates monthly; skipping one daily run loses no data.
+        # Log the skip to BQ and exit cleanly so CI does not fail.
+        result.status = "skipped"
+        result.error_message = str(exc)
+        log.warning("ckan_unreachable_skipping", error=str(exc))
 
     except Exception as exc:
         result.status = "error"
