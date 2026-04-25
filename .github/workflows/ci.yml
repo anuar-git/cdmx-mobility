@@ -42,6 +42,10 @@ jobs:
       - name: Run pytest
         run: uv run pytest tests/ -v
 
+      - name: dbt parse (validates SQL syntax and DAG without BigQuery connection)
+        working-directory: dbt_bigquery
+        run: uv run dbt parse
+
   terraform-validate:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
@@ -133,8 +137,10 @@ jobs:
           cd spark_jobs
           zip -r conformance.zip conformance/
           cd ..
+          zip -r ingestion.zip ingestion/
           gsutil -m cp spark_jobs/*.py gs://cdmx-mobility-data/code/spark_jobs/
           gsutil cp spark_jobs/conformance.zip gs://cdmx-mobility-data/code/spark_jobs/conformance.zip
+          gsutil cp ingestion.zip gs://cdmx-mobility-data/code/spark_jobs/ingestion.zip
 
       - name: Build and push ingestor image
         env:

@@ -4,11 +4,13 @@ variable "raw_bucket_name" { type = string }
 
 locals {
   datasets = {
-    raw_cdmx     = "Raw landing zone — external tables over GCS Parquet/JSON"
-    silver_cdmx  = "Silver — cleaned Parquet written by Spark jobs"
-    staging_cdmx = "Staging — dbt staging models, type-cast and renamed"
-    marts_cdmx   = "Marts — dimensional model, what Tableau queries"
-    meta_cdmx    = "Pipeline metadata — ingestion logs, dbt run results, GE results"
+    raw_cdmx       = "Raw landing zone — external tables over GCS Parquet/JSON"
+    silver_cdmx    = "Silver — cleaned Parquet written by Spark jobs"
+    staging_cdmx   = "Staging — dbt staging models, type-cast and renamed"
+    marts_cdmx     = "Marts — dimensional model, what Tableau queries"
+    meta_cdmx      = "Pipeline metadata — ingestion logs, dbt run results, GE results"
+    seeds_cdmx     = "Seeds — static reference data loaded by dbt (holidays, station locations)"
+    snapshots_cdmx = "Snapshots — SCD2 history tables managed by dbt snapshots"
   }
 }
 
@@ -324,16 +326,17 @@ resource "google_bigquery_table" "silver_metro_affluence" {
   deletion_protection = false
 
   external_data_configuration {
-    source_uris   = ["gs://${var.raw_bucket_name}/silver/metro/affluence/*"]
+    source_uris   = ["gs://${var.raw_bucket_name}/silver/metro/affluence_daily/*"]
     source_format = "PARQUET"
     autodetect    = false
 
     hive_partitioning_options {
       mode              = "CUSTOM"
-      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/metro/affluence/{service_date:DATE}"
+      source_uri_prefix = "gs://${var.raw_bucket_name}/silver/metro/affluence_daily/{service_date:DATE}"
     }
   }
 
+  # Spark job reads afluenciastc_simple_*.csv — no tipo_pago breakdown.
   schema = jsonencode([
     { name = "linea", type = "STRING", mode = "NULLABLE" },
     { name = "station_raw", type = "STRING", mode = "NULLABLE" },
@@ -388,17 +391,39 @@ resource "google_bigquery_table" "silver_weather_hourly_fact" {
     }
   }
 
+  # Wide-format schema: one row per UTC hour. The Spark job pivots from one row
+  # per (coordinate, hour) to one row per hour with per-coordinate columns named
+  # {coordinate_id}_{metric}. obs_time STRING is dropped; obs_timestamp TIMESTAMP
+  # is written instead. There is no coordinate_id column in the output.
   schema = jsonencode([
-    { name = "coordinate_id", type = "STRING", mode = "NULLABLE" },
-    { name = "obs_time", type = "STRING", mode = "NULLABLE" },
-    { name = "temperature_2m", type = "FLOAT", mode = "NULLABLE" },
-    { name = "precipitation", type = "FLOAT", mode = "NULLABLE" },
-    { name = "windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
-    { name = "relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "obs_timestamp", type = "TIMESTAMP", mode = "NULLABLE" },
+    # -- per-coordinate columns (5 coordinates × 4 metrics = 20) --
+    { name = "centro_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "centro_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "centro_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "centro_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "aeropuerto_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "aeropuerto_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "aeropuerto_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "aeropuerto_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "pedregal_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "pedregal_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "pedregal_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "pedregal_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "tlalnepantla_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "tlalnepantla_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "tlalnepantla_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "tlalnepantla_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "ecatepec_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "ecatepec_precipitation", type = "FLOAT", mode = "NULLABLE" },
+    { name = "ecatepec_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
+    { name = "ecatepec_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    # -- city-wide averages (4) --
     { name = "avg_temperature_2m", type = "FLOAT", mode = "NULLABLE" },
     { name = "avg_precipitation", type = "FLOAT", mode = "NULLABLE" },
     { name = "avg_windspeed_10m", type = "FLOAT", mode = "NULLABLE" },
     { name = "avg_relativehumidity_2m", type = "FLOAT", mode = "NULLABLE" },
+    # -- derived features (4) --
     { name = "heat_index", type = "FLOAT", mode = "NULLABLE" },
     { name = "precipitation_flag", type = "BOOLEAN", mode = "NULLABLE" },
     { name = "wind_category", type = "STRING", mode = "NULLABLE" },

@@ -24,8 +24,14 @@ resource "google_storage_bucket_object" "dataproc_init" {
     echo "TZ=America/Mexico_City" >> /etc/environment
     source /etc/environment
     # Install packages absent from the Dataproc 2.2 base image.
-    # h3 spatial indexing, GTFS-RT protobuf bindings, chispa test assertions.
-    pip install --quiet h3==3.7.7 "gtfs-realtime-bindings" chispa
+    # google-cloud-{bigquery,storage} are pre-installed; do not re-add them here.
+    pip install --quiet \
+      structlog \
+      click \
+      pydantic-settings \
+      h3==3.7.7 \
+      "gtfs-realtime-bindings" \
+      chispa
   EOT
 }
 
@@ -43,7 +49,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
         gce_cluster_config {
           zone                   = "${var.region}-a"
           service_account        = var.service_account_email
-          service_account_scopes = ["cloud-platform"]
+          service_account_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
         }
 
         master_config {
@@ -85,7 +91,10 @@ resource "google_dataproc_workflow_template" "spark_job" {
     step_id = "spark-job"
     pyspark_job {
       main_python_file_uri = each.value
-      python_file_uris     = ["gs://${var.bucket_name}/code/spark_jobs/conformance.zip"]
+      python_file_uris = [
+        "gs://${var.bucket_name}/code/spark_jobs/conformance.zip",
+        "gs://${var.bucket_name}/code/spark_jobs/ingestion.zip",
+      ]
     }
   }
 }
