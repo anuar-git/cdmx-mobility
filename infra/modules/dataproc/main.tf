@@ -92,7 +92,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
     pyspark_job {
       main_python_file_uri = each.value
       python_file_uris = [
-        "gs://${var.bucket_name}/code/spark_jobs/conformance.zip",
+        "gs://${var.bucket_name}/code/spark_jobs/spark_jobs.zip",
         "gs://${var.bucket_name}/code/spark_jobs/ingestion.zip",
       ]
     }
