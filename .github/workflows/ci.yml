@@ -42,6 +42,23 @@ jobs:
       - name: Run pytest
         run: uv run pytest tests/ -v
 
+      - name: Create dbt profile (offline — parse only, no BigQuery connection)
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          cdmx_mobility:
+            target: prod
+            outputs:
+              prod:
+                type: bigquery
+                method: oauth
+                project: cdmx-mobility-prod
+                dataset: marts_cdmx
+                threads: 1
+                timeout_seconds: 300
+                location: US
+          EOF
+
       - name: dbt parse (validates SQL syntax and DAG without BigQuery connection)
         working-directory: dbt_bigquery
         run: uv run dbt parse
