@@ -1,0 +1,87 @@
+version: 2
+
+exposures:
+
+  - name: cdmx_mobility_overview
+    type: dashboard
+    maturity: low
+    description: >
+      Main CDMX mobility dashboard. Shows hourly EcoBici availability and
+      Metrobús service levels side-by-side with weather conditions. Primary
+      filters: date range, mode, weather_condition, is_adverse_weather,
+      is_quincena_payday. Intended for operational monitoring and ridership
+      pattern analysis.
+    owner:
+      name: Anuar
+      email: anuar.hage@gmail.com
+    depends_on:
+      - ref('fct_unified_mobility_hourly')
+      - ref('dim_station')
+      - ref('dim_date')
+      - ref('dim_weather_condition')
+
+  - name: metro_ridership
+    type: dashboard
+    maturity: low
+    description: >
+      Daily Metro station ridership dashboard. Shows daily_entries by station,
+      line, borough, and date attributes. Key analysis dimensions: weekday vs
+      weekend, public holidays, quincena paydays, school vacation windows.
+      Joins dim_station for geographic filtering by alcaldía.
+    owner:
+      name: Anuar
+      email: anuar.hage@gmail.com
+    depends_on:
+      - ref('fct_metro_affluence_daily')
+      - ref('dim_station')
+      - ref('dim_date')
+
+  - name: ecobici_station_availability
+    type: dashboard
+    maturity: low
+    description: >
+      Hourly EcoBici station availability dashboard. Shows bikes_available_avg,
+      stockout_minutes, fill_ratio, and availability_ratio per station and hour.
+      Includes the 24-hour ARIMA_PLUS demand forecast overlay from
+      marts_cdmx.ecobici_demand_forecast_24h once that scheduled query is active.
+      Map layer uses dim_station geography.
+    owner:
+      name: Anuar
+      email: anuar.hage@gmail.com
+    depends_on:
+      - ref('fct_ecobici_station_hourly')
+      - ref('dim_station')
+      - ref('dim_date')
+      - ref('dim_weather_condition')
+
+  - name: metrobus_operations
+    type: dashboard
+    maturity: low
+    description: >
+      Metrobús operations dashboard. Shows headway, dwell time, and vehicle
+      frequency per route and stop. Primary filters: route_id, service_date,
+      is_weekend, is_public_holiday. Headway spikes highlight service gaps;
+      dwell time highlights high-boarding stops for capacity planning.
+    owner:
+      name: Anuar
+      email: anuar.hage@gmail.com
+    depends_on:
+      - ref('fct_metrobus_stop_events')
+      - ref('dim_station')
+      - ref('dim_date')
+
+  - name: multimodal_interchange_map
+    type: dashboard
+    maturity: low
+    description: >
+      Spatial map showing EcoBici stations within 200 m of a Metro station.
+      Enables identification of multimodal interchange points — locations where
+      riders can transfer between EcoBici and Metro within a 2-minute walk.
+      Powered by the spatial proximity analysis; must be materialised as
+      marts_cdmx.geo_ecobici_near_metro (see analyses/spatial_proximity_ecobici_near_metro.sql)
+      before this dashboard can connect to live data.
+    owner:
+      name: Anuar
+      email: anuar.hage@gmail.com
+    depends_on:
+      - ref('dim_station')

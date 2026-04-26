@@ -70,6 +70,7 @@ class OpenMeteoClient:
             "start_date": date,
             "end_date": date,
             "timezone": "UTC",
+            "temperature_unit": "celsius",
             "wind_speed_unit": "ms",
         }
         with httpx.Client(timeout=self._timeout) as client:

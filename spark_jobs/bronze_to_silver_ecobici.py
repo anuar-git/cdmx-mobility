@@ -58,7 +58,6 @@ from pyspark.sql.types import IntegerType, TimestampType
 from pyspark.sql.window import Window
 
 from ingestion.bq_logger import IngestionLogger, RunResult
-from ingestion.config import Settings
 from spark_jobs.conformance.spark_session import get_spark_session
 from spark_jobs.conformance.time_utils import extract_service_date
 
@@ -245,17 +244,23 @@ def run_job(
     is_flag=True,
     help="Run with local[2] master for smoke-testing (no cluster needed)",
 )
+@click.option(
+    "--gcp-project-id",
+    envvar="CDMX_GCP_PROJECT_ID",
+    required=True,
+    help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
+)
 def run(
     input_path: str,
     info_input: str,
     output_path: str,
     local: bool,
+    gcp_project_id: str,
 ) -> None:
     """Transform EcoBici station_status snapshots to Silver state-change Parquet."""
-    settings = Settings()
     spark = get_spark_session("cdmx-ecobici-silver", local=local)
     try:
-        run_job(spark, input_path, info_input, output_path, settings.gcp_project_id)
+        run_job(spark, input_path, info_input, output_path, gcp_project_id)
     finally:
         spark.stop()
 

@@ -1,0 +1,186 @@
+version: 2
+
+models:
+  - name: stg_silver_ecobici_state_changes
+    description: >
+      Deduplicated EcoBici station state changes from Silver Parquet. One row per
+      (snapshot_ts, station_id) where at least one field changed since the prior
+      snapshot. is_renting / is_returning are cast from INTEGER (0/1) to BOOLEAN.
+    columns:
+      - name: snapshot_ts
+        description: UTC timestamp of the GBFS snapshot where the change was first seen.
+        tests:
+          - not_null
+      - name: station_id
+        description: EcoBici station identifier.
+        tests:
+          - not_null
+      - name: num_bikes_available
+        description: Number of bikes available at the station at this snapshot.
+        tests:
+          - not_null
+      - name: num_docks_available
+        description: Number of docks available at the station at this snapshot.
+        tests:
+          - not_null
+      - name: is_renting
+        description: True if the station is accepting rentals.
+      - name: is_returning
+        description: True if the station is accepting returns.
+      - name: service_date
+        description: CDMX-local date (UTC-6) of snapshot_ts. Hive partition column.
+        tests:
+          - not_null
+
+  - name: stg_silver_ecobici_station_master
+    description: >
+      Latest EcoBici station reference data from Silver Parquet. One row per station.
+      Adds a BigQuery GEOGRAPHY point (geog) from lat/lon for spatial joins.
+    columns:
+      - name: station_id
+        description: EcoBici station identifier.
+        tests:
+          - not_null
+          - unique
+      - name: name
+        description: Human-readable station name.
+        tests:
+          - not_null
+      - name: lat
+        description: WGS-84 latitude.
+        tests:
+          - not_null
+      - name: lon
+        description: WGS-84 longitude.
+        tests:
+          - not_null
+      - name: capacity
+        description: Total number of docks at the station.
+      - name: geog
+        description: BigQuery GEOGRAPHY point derived from lon/lat for ST_DWITHIN / ST_DISTANCE queries.
+
+  - name: stg_silver_metro_affluence
+    description: >
+      Daily Metro entry counts per (service_date, linea, station_canonical, tipo_pago)
+      from Silver Parquet. linea is uppercased for consistency. is_free_pass flags
+      Gratuidad (free-pass) entries which represent subsidised ridership.
+      Note: this table is daily granularity — there is no hourly breakdown in the source.
+    columns:
+      - name: service_date
+        description: Date of the recorded entry count.
+        tests:
+          - not_null
+      - name: linea
+        description: Metro line identifier, uppercased (e.g. LINEA 1).
+        tests:
+          - not_null
+      - name: station_canonical
+        description: Normalised station name after mojibake fix and variant lookup.
+        tests:
+          - not_null
+      - name: daily_entries
+        description: >
+          Total daily entries for this station and line. The Spark Silver job
+          processes afluenciastc_simple_*.csv which aggregates all payment types
+          into a single daily count. tipo_pago breakdown requires a separate
+          afluenciastc_desglosado pipeline not yet implemented.
+        tests:
+          - not_null
+
+  - name: stg_silver_metrobus_stop_events
+    description: >
+      Metrobús vehicle dwell events at stops from Silver Parquet. One row per
+      continuous dwell session. route_id is a Hive partition column exposed as a
+      virtual column by BigQuery CUSTOM hive partitioning.
+    columns:
+      - name: vehicle_id
+        description: GTFS-RT vehicle identifier.
+        tests:
+          - not_null
+      - name: stop_id
+        description: GTFS stop identifier where the vehicle dwelled.
+        tests:
+          - not_null
+      - name: stop_name
+        description: Human-readable stop name at time of event.
+      - name: route_id
+        description: GTFS route identifier. Sourced from the Hive partition path.
+        tests:
+          - not_null
+      - name: trip_id
+        description: GTFS trip identifier.
+      - name: stop_sequence
+        description: Stop sequence number within the trip.
+      - name: dwell_start_ts
+        description: UTC timestamp when the vehicle arrived at the stop.
+        tests:
+          - not_null
+      - name: dwell_end_ts
+        description: UTC timestamp when the vehicle departed the stop.
+        tests:
+          - not_null
+      - name: dwell_seconds
+        description: Total dwell duration in seconds.
+        tests:
+          - not_null
+      - name: dwell_minutes
+        description: Total dwell duration in minutes (dwell_seconds / 60.0).
+      - name: service_date
+        description: CDMX-local date of dwell_start_ts. Hive partition column.
+        tests:
+          - not_null
+
+  - name: stg_silver_weather_hourly
+    description: >
+      City-wide hourly weather observations from Silver Parquet. The Spark job
+      pivots five CDMX coordinates into a wide row per UTC hour, then adds
+      arithmetic city-wide averages (avg_*) and derived comfort features.
+      This model exposes only the avg_* and derived columns — the raw
+      per-coordinate columns (centro_*, aeropuerto_*, etc.) remain in Silver
+      for ad-hoc queries but are not needed for the Gold layer.
+    columns:
+      - name: obs_hour
+        description: UTC hour of the observation, truncated to the hour boundary.
+        tests:
+          - not_null
+          - unique
+      - name: avg_temperature_2m
+        description: Arithmetic mean of 2m air temperature across all five CDMX coordinates (°C).
+        tests:
+          - not_null
+      - name: avg_precipitation
+        description: Arithmetic mean of precipitation across all five coordinates (mm).
+        tests:
+          - not_null
+      - name: avg_windspeed_10m
+        description: Arithmetic mean of 10m windspeed across all five coordinates (m/s).
+        tests:
+          - not_null
+      - name: avg_relativehumidity_2m
+        description: Arithmetic mean of relative humidity across all five coordinates (%).
+        tests:
+          - not_null
+      - name: heat_index
+        description: >
+          Rothfusz heat index in Celsius applied to city-wide avg temperature and humidity.
+          Uses the simple Steadman formula when HI < 80°F, full regression otherwise.
+      - name: comfort_score
+        description: Composite 0–100 comfort index (100 = ideal). Penalised by temperature deviation, precipitation, and wind.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: wind_category
+        description: Simplified Beaufort category — calm (<1.5 m/s), breeze (1.5–10.7 m/s), strong (≥10.7 m/s).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['calm', 'breeze', 'strong']
+      - name: precipitation_flag
+        description: True when avg_precipitation > 0.1 mm.
+      - name: service_date
+        description: UTC date of the observation hour. Hive partition column.
+        tests:
+          - not_null

@@ -59,6 +59,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
     col,
     first,
+    from_unixtime,
     input_file_name,
     lag,
     lit,
@@ -73,7 +74,6 @@ from pyspark.sql.types import DoubleType, IntegerType, TimestampType
 from pyspark.sql.window import Window
 
 from ingestion.bq_logger import IngestionLogger, RunResult
-from ingestion.config import Settings
 from spark_jobs.conformance.h3_utils import lat_lon_to_h3_udf, snap_to_nearest_stop
 from spark_jobs.conformance.spark_session import get_spark_session
 from spark_jobs.conformance.time_utils import extract_service_date
@@ -88,9 +88,13 @@ DEFAULT_OUTPUT_PATH = f"gs://{_BUCKET}/silver/metrobus/stop_events/"
 
 # A gap larger than this (seconds) between consecutive at-stop records breaks
 # the session and starts a new dwell event for that vehicle+stop pair.
-SESSION_GAP_SECONDS: int = 60
+# sinopticoplus delivers snapshots every ~5 minutes (300s); set the threshold
+# above that so consecutive same-stop readings form a single session.
+SESSION_GAP_SECONDS: int = 600
 
 # Dwell events shorter than this are drive-by observations; they are dropped.
+# With ~5-minute snapshot intervals, any detected dwell is at least 300s;
+# this threshold just guards against single-reading edge cases.
 MIN_DWELL_SECONDS: int = 30
 
 
@@ -109,16 +113,15 @@ def _load_positions(spark: SparkSession, input_path: str) -> DataFrame:
             col("vehicle.vehicle.id").alias("vehicle_id"),
             col("vehicle.vehicle.label").alias("vehicle_label"),
             col("vehicle.trip.route_id").alias("route_id"),
-            col("vehicle.trip.trip_id").alias("trip_id"),
-            # GTFS-RT VehiclePosition.current_stop_sequence: the stop sequence
-            # the vehicle is currently at or heading toward.
-            col("vehicle.current_stop_sequence").cast(IntegerType()).alias("stop_sequence"),
+            # sinopticoplus omits trip_id, current_stop_sequence, current_status
+            lit(None).cast("string").alias("trip_id"),
+            lit(None).cast(IntegerType()).alias("stop_sequence"),
             col("vehicle.position.latitude").cast(DoubleType()).alias("latitude"),
             col("vehicle.position.longitude").cast(DoubleType()).alias("longitude"),
-            col("vehicle.current_status").alias("current_status"),
-            # GTFS-RT VehiclePosition.timestamp is epoch seconds (not ms).
-            # Cast directly to TimestampType; no /1000 division needed.
-            col("vehicle.timestamp").cast(TimestampType()).alias("timestamp"),
+            lit(None).cast("string").alias("current_status"),
+            # vehicle.timestamp is epoch seconds as a string; direct cast to
+            # TimestampType returns null in Spark 3 — use from_unixtime instead.
+            from_unixtime(col("vehicle.timestamp")).cast(TimestampType()).alias("timestamp"),
         )
         .filter(col("latitude").isNotNull() & col("longitude").isNotNull())
     )
@@ -256,6 +259,7 @@ def run_job(
             stop_h3_col="stop_h3",
             max_h3_distance=2,
         )
+        log.info("snapped_row_count", row_count=snapped.count())
 
         df = _compute_dwell_events(snapped)
 
@@ -309,17 +313,23 @@ def run_job(
     is_flag=True,
     help="Run with local[2] master for smoke-testing (no cluster needed)",
 )
+@click.option(
+    "--gcp-project-id",
+    envvar="CDMX_GCP_PROJECT_ID",
+    required=True,
+    help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
+)
 def run(
     input_path: str,
     stops_input: str,
     output_path: str,
     local: bool,
+    gcp_project_id: str,
 ) -> None:
     """Transform Metrobús vehicle positions to Silver stop-dwell events."""
-    settings = Settings()
     spark = get_spark_session("cdmx-metrobus-stop-events-silver", local=local)
     try:
-        run_job(spark, input_path, stops_input, output_path, settings.gcp_project_id)
+        run_job(spark, input_path, stops_input, output_path, gcp_project_id)
     finally:
         spark.stop()
 

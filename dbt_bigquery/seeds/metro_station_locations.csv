@@ -1,0 +1,191 @@
+station_canonical,linea,lat,lon,borough,colonia,opened_date
+Observatorio,Línea 1,19.4029,-99.1942,Álvaro Obregón,Observatorio,1972-08-14
+Tacubaya,Línea 1,19.4020,-99.1875,Miguel Hidalgo,Tacubaya,1969-09-04
+Juanacatlán,Línea 1,19.4077,-99.1838,Miguel Hidalgo,San Miguel Chapultepec,1969-09-04
+Chapultepec,Línea 1,19.4204,-99.1822,Cuauhtémoc,Bosque de Chapultepec,1969-09-04
+Sevilla,Línea 1,19.4251,-99.1749,Cuauhtémoc,Cuauhtémoc,1969-09-04
+Insurgentes,Línea 1,19.4272,-99.1687,Cuauhtémoc,Roma Norte,1969-09-04
+Cuauhtémoc,Línea 1,19.4300,-99.1615,Cuauhtémoc,Roma Norte,1969-09-04
+Balderas,Línea 1,19.4315,-99.1479,Cuauhtémoc,Centro,1969-09-04
+Salto del Agua,Línea 1,19.4260,-99.1428,Cuauhtémoc,Centro,1969-09-04
+Isabel la Católica,Línea 1,19.4295,-99.1370,Cuauhtémoc,Centro Histórico,1969-09-04
+Pino Suárez,Línea 1,19.4260,-99.1305,Cuauhtémoc,Centro Histórico,1969-09-04
+Merced,Línea 1,19.4255,-99.1224,Venustiano Carranza,Merced Balbuena,1969-09-04
+Candelaria,Línea 1,19.4258,-99.1138,Venustiano Carranza,Merced,1969-09-04
+San Lázaro,Línea 1,19.4313,-99.1071,Venustiano Carranza,Jardín Balbuena,1969-09-04
+Moctezuma,Línea 1,19.4270,-99.0972,Venustiano Carranza,Jardín Balbuena,1969-09-04
+Balbuena,Línea 1,19.4257,-99.0887,Venustiano Carranza,Balbuena,1969-09-04
+Boulevard Puerto Aéreo,Línea 1,19.4236,-99.0797,Venustiano Carranza,Aeronáutica Militar,1969-09-04
+Gómez Farías,Línea 1,19.4207,-99.0756,Venustiano Carranza,Jardín Balbuena,1969-09-04
+Zaragoza,Línea 1,19.4144,-99.0781,Venustiano Carranza,Peñón de los Baños,1969-09-04
+Pantitlán,Línea 1,19.4145,-99.0724,Iztapalapa,Jardines de Atzacualco,1969-09-04
+Cuatro Caminos,Línea 2,19.4912,-99.2081,Azcapotzalco,San Marcos,1970-08-14
+Panteones,Línea 2,19.4844,-99.2022,Azcapotzalco,San Marcos,1970-08-14
+Tacuba,Línea 2,19.4727,-99.1966,Azcapotzalco,Tacuba,1970-08-14
+Cuitláhuac,Línea 2,19.4693,-99.1875,Azcapotzalco,San Miguel Amantla,1970-08-14
+Popotla,Línea 2,19.4635,-99.1810,Miguel Hidalgo,Popotla,1970-08-14
+Colegio Militar,Línea 2,19.4577,-99.1757,Miguel Hidalgo,Tacuba,1970-08-14
+Normal,Línea 2,19.4528,-99.1700,Miguel Hidalgo,Santa María la Ribera,1970-08-14
+San Cosme,Línea 2,19.4472,-99.1639,Miguel Hidalgo,San Rafael,1970-08-14
+Revolución,Línea 2,19.4430,-99.1556,Cuauhtémoc,Santa María la Ribera,1970-08-14
+Hidalgo,Línea 2,19.4390,-99.1465,Cuauhtémoc,Centro Histórico,1970-08-14
+Bellas Artes,Línea 2,19.4354,-99.1406,Cuauhtémoc,Centro Histórico,1970-08-14
+Allende,Línea 2,19.4352,-99.1371,Cuauhtémoc,Centro Histórico,1970-08-14
+Zócalo/Tenochtitlan,Línea 2,19.4325,-99.1330,Cuauhtémoc,Centro Histórico,1970-08-14
+Pino Suárez,Línea 2,19.4260,-99.1305,Cuauhtémoc,Centro Histórico,1970-08-14
+San Antonio Abad,Línea 2,19.4190,-99.1280,Cuauhtémoc,Doctores,1970-08-14
+Chabacano,Línea 2,19.4120,-99.1225,Cuauhtémoc,Doctores,1970-08-14
+Viaducto,Línea 2,19.4055,-99.1208,Benito Juárez,Viaducto,1970-08-14
+Xola,Línea 2,19.3998,-99.1188,Benito Juárez,Vertiz Narvarte,1970-08-14
+Villa de Cortés,Línea 2,19.3933,-99.1175,Benito Juárez,Narvarte Poniente,1970-08-14
+Nativitas,Línea 2,19.3870,-99.1155,Benito Juárez,Narvarte Poniente,1970-08-14
+Portales,Línea 2,19.3793,-99.1135,Benito Juárez,Portales Norte,1970-08-14
+Ermita,Línea 2,19.3728,-99.1125,Iztapalapa,Ermita,1970-08-14
+General Anaya,Línea 2,19.3657,-99.1104,Coyoacán,General Anaya,1970-08-14
+Tasqueña,Línea 2,19.3570,-99.1079,Coyoacán,Santa Úrsula Coapa,1970-08-14
+Indios Verdes,Línea 3,19.5128,-99.1170,Gustavo A. Madero,Lindavista,1970-08-14
+Deportivo 18 de Marzo,Línea 3,19.4987,-99.1277,Gustavo A. Madero,Nueva Vallejo,1970-08-14
+Potrero,Línea 3,19.4848,-99.1330,Gustavo A. Madero,Vallejo,1970-08-14
+La Raza,Línea 3,19.4750,-99.1329,Gustavo A. Madero,La Raza,1970-08-14
+Tlatelolco,Línea 3,19.4545,-99.1388,Cuauhtémoc,Tlatelolco,1970-08-14
+Guerrero,Línea 3,19.4465,-99.1445,Cuauhtémoc,Guerrero,1970-08-14
+Hidalgo,Línea 3,19.4390,-99.1465,Cuauhtémoc,Centro Histórico,1970-08-14
+Juárez,Línea 3,19.4355,-99.1483,Cuauhtémoc,Juárez,1970-08-14
+Balderas,Línea 3,19.4315,-99.1479,Cuauhtémoc,Centro,1970-08-14
+Niños Héroes,Línea 3,19.4271,-99.1482,Cuauhtémoc,Doctores,1970-08-14
+Hospital General,Línea 3,19.4219,-99.1475,Cuauhtémoc,Doctores,1970-08-14
+Centro Médico,Línea 3,19.4177,-99.1500,Cuauhtémoc,Doctores,1970-08-14
+Etiopía/Plaza de la Transparencia,Línea 3,19.4113,-99.1500,Benito Juárez,Nápoles,1970-08-14
+Eugenia,Línea 3,19.4047,-99.1495,Benito Juárez,Nápoles,1970-08-14
+División del Norte,Línea 3,19.3981,-99.1499,Benito Juárez,Del Valle Centro,1970-08-14
+Zapata,Línea 3,19.3913,-99.1494,Benito Juárez,Del Valle Centro,1970-08-14
+Coyoacán,Línea 3,19.3849,-99.1540,Coyoacán,Del Valle Sur,1970-08-14
+Viveros/Derechos Humanos,Línea 3,19.3782,-99.1597,Coyoacán,Viveros de Coyoacán,1970-08-14
+Miguel Ángel de Quevedo,Línea 3,19.3711,-99.1680,Coyoacán,Romero de Terreros,1970-08-14
+Copilco,Línea 3,19.3590,-99.1726,Coyoacán,Copilco el Alto,1970-08-14
+Universidad,Línea 3,19.3261,-99.1756,Coyoacán,Pedregal de Santa Úrsula,1970-08-14
+Martín Carrera,Línea 4,19.5072,-99.1082,Gustavo A. Madero,Martín Carrera,1981-12-19
+Talismán,Línea 4,19.4951,-99.1082,Gustavo A. Madero,Martín Carrera,1981-12-19
+Bondojito,Línea 4,19.4830,-99.1097,Gustavo A. Madero,San Juan de Aragón,1981-12-19
+Consulado,Línea 4,19.4739,-99.1101,Gustavo A. Madero,Peralvillo,1981-12-19
+Canal del Norte,Línea 4,19.4601,-99.1113,Cuauhtémoc,Tepito,1981-12-19
+Morelos,Línea 4,19.4519,-99.1158,Cuauhtémoc,Morelos,1981-12-19
+Candelaria,Línea 4,19.4258,-99.1138,Venustiano Carranza,Merced,1981-12-19
+Fray Servando,Línea 4,19.4183,-99.1222,Cuauhtémoc,Doctores,1981-12-19
+Jamaica,Línea 4,19.4128,-99.1100,Iztacalco,Jamaica,1981-12-19
+Santa Anita,Línea 4,19.4049,-99.1065,Iztacalco,Santa Anita,1981-12-19
+Politécnico,Línea 5,19.4984,-99.1453,Gustavo A. Madero,Nueva Vallejo,1981-12-19
+Instituto del Petróleo,Línea 5,19.4880,-99.1375,Gustavo A. Madero,Nueva Vallejo,1981-12-19
+Autobuses del Norte,Línea 5,19.4800,-99.1238,Gustavo A. Madero,Industrial Vallejo,1981-12-19
+Río de los Remedios,Línea 5,19.4758,-99.1190,Gustavo A. Madero,Nueva Atzacoalco,1981-12-19
+Aragón,Línea 5,19.4693,-99.1075,Gustavo A. Madero,San Juan de Aragón,1981-12-19
+Eduardo Molina,Línea 5,19.4626,-99.1049,Gustavo A. Madero,Ampliación Casas Alemán,1981-12-19
+Consulado,Línea 5,19.4739,-99.1101,Gustavo A. Madero,Peralvillo,1981-12-19
+Canal del Norte,Línea 5,19.4601,-99.1113,Cuauhtémoc,Tepito,1981-12-19
+Morelos,Línea 5,19.4519,-99.1158,Cuauhtémoc,Morelos,1981-12-19
+Hangares,Línea 5,19.4315,-99.0798,Venustiano Carranza,Aeropuerto,1981-12-19
+Terminal Aérea,Línea 5,19.4318,-99.0723,Venustiano Carranza,Aeropuerto,1981-12-19
+Pantitlán,Línea 5,19.4145,-99.0724,Iztapalapa,Jardines de Atzacualco,1981-12-19
+El Rosario,Línea 6,19.5182,-99.1987,Azcapotzalco,El Rosario,1983-12-27
+Tezozomoc,Línea 6,19.5127,-99.1910,Azcapotzalco,Tezozomoc,1983-12-27
+UAM Azcapotzalco,Línea 6,19.5057,-99.1846,Azcapotzalco,Azcapotzalco,1983-12-27
+Ferrería/Arena Ciudad de México,Línea 6,19.4999,-99.1797,Azcapotzalco,Ferrería,1983-12-27
+Norte 45,Línea 6,19.4921,-99.1720,Azcapotzalco,Vallejo,1983-12-27
+Vallejo,Línea 6,19.4856,-99.1599,Azcapotzalco,Vallejo,1983-12-27
+Instituto del Petróleo,Línea 6,19.4880,-99.1375,Gustavo A. Madero,Nueva Vallejo,1983-12-27
+Lindavista,Línea 6,19.4833,-99.1285,Gustavo A. Madero,Lindavista,1983-12-27
+Deportivo 18 de Marzo,Línea 6,19.4987,-99.1277,Gustavo A. Madero,Nueva Vallejo,1983-12-27
+La Villa/Basílica,Línea 6,19.4871,-99.1219,Gustavo A. Madero,Villa de Guadalupe,1983-12-27
+Martín Carrera,Línea 6,19.5072,-99.1082,Gustavo A. Madero,Martín Carrera,1983-12-27
+El Rosario,Línea 7,19.5182,-99.1987,Azcapotzalco,El Rosario,1984-12-04
+Aquiles Serdán,Línea 7,19.5088,-99.1991,Azcapotzalco,San Álvaro,1984-12-04
+Camarones,Línea 7,19.4990,-99.2010,Azcapotzalco,Camarones,1984-12-04
+Refinería,Línea 7,19.4895,-99.2001,Azcapotzalco,Refinería,1984-12-04
+Tacuba,Línea 7,19.4727,-99.1966,Azcapotzalco,Tacuba,1984-12-04
+San Joaquín,Línea 7,19.4550,-99.1875,Miguel Hidalgo,San Joaquín,1984-12-04
+Polanco,Línea 7,19.4337,-99.1887,Miguel Hidalgo,Polanco,1984-12-04
+Auditorio,Línea 7,19.4290,-99.1899,Miguel Hidalgo,Bosque de Chapultepec,1984-12-04
+Constituyentes,Línea 7,19.4148,-99.1901,Miguel Hidalgo,Lomas de Chapultepec,1984-12-04
+Tacubaya,Línea 7,19.4020,-99.1875,Miguel Hidalgo,Tacubaya,1984-12-04
+San Pedro de los Pinos,Línea 7,19.3930,-99.1884,Benito Juárez,San Pedro de los Pinos,1984-12-04
+San Antonio,Línea 7,19.3861,-99.1905,Álvaro Obregón,San Antonio,1984-12-04
+Mixcoac,Línea 7,19.3800,-99.1920,Álvaro Obregón,Mixcoac,1984-12-04
+Barranca del Muerto,Línea 7,19.3730,-99.1960,Álvaro Obregón,Barranca del Muerto,1984-12-04
+Garibaldi/Lagunilla,Línea 8,19.4396,-99.1384,Cuauhtémoc,Lagunilla,1994-07-18
+Bellas Artes,Línea 8,19.4354,-99.1406,Cuauhtémoc,Centro Histórico,1994-07-18
+San Juan de Letrán,Línea 8,19.4303,-99.1430,Cuauhtémoc,Centro,1994-07-18
+Doctores,Línea 8,19.4236,-99.1380,Cuauhtémoc,Doctores,1994-07-18
+Obrera,Línea 8,19.4179,-99.1334,Cuauhtémoc,Obrera,1994-07-18
+Chabacano,Línea 8,19.4120,-99.1225,Cuauhtémoc,Doctores,1994-07-18
+Jamaica,Línea 8,19.4128,-99.1100,Iztacalco,Jamaica,1994-07-18
+La Viga,Línea 8,19.4065,-99.1030,Iztacalco,La Viga,1994-07-18
+Santa Anita,Línea 8,19.4049,-99.1065,Iztacalco,Santa Anita,1994-07-18
+Coyuya,Línea 8,19.4007,-99.1012,Iztacalco,Coyuya,1994-07-18
+Iztacalco,Línea 8,19.3956,-99.1010,Iztacalco,Iztacalco,1994-07-18
+Apatlaco,Línea 8,19.3892,-99.0988,Iztapalapa,Apatlaco,1994-07-18
+Aculco,Línea 8,19.3822,-99.0965,Iztapalapa,Aculco,1994-07-18
+Escuadrón 201,Línea 8,19.3757,-99.0940,Iztapalapa,Escuadrón 201,1994-07-18
+Atlalilco,Línea 8,19.3693,-99.0928,Iztapalapa,Atlalilco,1994-07-18
+Iztapalapa,Línea 8,19.3616,-99.0908,Iztapalapa,Iztapalapa,1994-07-18
+Cerro de la Estrella,Línea 8,19.3546,-99.0895,Iztapalapa,Cerro de la Estrella,1994-07-18
+UAM I,Línea 8,19.3490,-99.0875,Iztapalapa,UAM Iztapalapa,1994-07-18
+Constitución de 1917,Línea 8,19.3428,-99.0847,Iztapalapa,Constitución de 1917,1994-07-18
+Tacubaya,Línea 9,19.4020,-99.1875,Miguel Hidalgo,Tacubaya,1987-08-01
+Patriotismo,Línea 9,19.4078,-99.1757,Benito Juárez,Mixcoac,1987-08-01
+Chilpancingo,Línea 9,19.4124,-99.1640,Cuauhtémoc,Nápoles,1987-08-01
+Centro Médico,Línea 9,19.4177,-99.1500,Cuauhtémoc,Doctores,1987-08-01
+Lázaro Cárdenas,Línea 9,19.4155,-99.1383,Cuauhtémoc,Doctores,1987-08-01
+Chabacano,Línea 9,19.4120,-99.1225,Cuauhtémoc,Doctores,1987-08-01
+Jamaica,Línea 9,19.4128,-99.1100,Iztacalco,Jamaica,1987-08-01
+Puebla,Línea 9,19.4150,-99.1001,Iztacalco,Puebla,1987-08-01
+Ciudad Deportiva,Línea 9,19.4150,-99.0905,Iztacalco,Ciudad Deportiva,1987-08-01
+Velódromo,Línea 9,19.4148,-99.0815,Iztacalco,Velódromo,1987-08-01
+Pantitlán,Línea 9,19.4145,-99.0724,Iztapalapa,Jardines de Atzacualco,1987-08-01
+La Paz,Línea A,19.4129,-98.9965,Los Reyes La Paz,La Paz,1991-08-16
+Los Reyes,Línea A,19.4135,-99.0072,Iztapalapa,Los Reyes,1991-08-16
+Santa Marta,Línea A,19.4139,-99.0181,Iztapalapa,Santa Marta Acatitla,1991-08-16
+Acatitla,Línea A,19.4142,-99.0279,Iztapalapa,Santa Marta Acatitla,1991-08-16
+Peñón Viejo,Línea A,19.4145,-99.0373,Iztapalapa,Peñón Viejo,1991-08-16
+Guelatao,Línea A,19.4145,-99.0465,Iztapalapa,Guelatao,1991-08-16
+Tepalcates,Línea A,19.4145,-99.0548,Iztapalapa,Tepalcates,1991-08-16
+Agrícola Oriental,Línea A,19.4145,-99.0626,Iztapalapa,Agrícola Oriental,1991-08-16
+Canal de San Juan,Línea A,19.4145,-99.0674,Iztapalapa,Canal de San Juan,1991-08-16
+Pantitlán,Línea A,19.4145,-99.0724,Iztapalapa,Jardines de Atzacualco,1991-08-16
+Buenavista,Línea B,19.4575,-99.1520,Cuauhtémoc,Buenavista,1999-12-15
+Guerrero,Línea B,19.4465,-99.1445,Cuauhtémoc,Guerrero,1999-12-15
+Garibaldi/Lagunilla,Línea B,19.4396,-99.1384,Cuauhtémoc,Lagunilla,1999-12-15
+Tepito,Línea B,19.4420,-99.1280,Cuauhtémoc,Tepito,1999-12-15
+Flores Magón,Línea B,19.4432,-99.1167,Venustiano Carranza,Flores Magón,1999-12-15
+Romero Rubio,Línea B,19.4448,-99.1055,Venustiano Carranza,Romero Rubio,1999-12-15
+Oceanía,Línea B,19.4459,-99.0938,Venustiano Carranza,Oceanía,1999-12-15
+Deportivo Oceanía,Línea B,19.4475,-99.0838,Venustiano Carranza,Jardín Balbuena,1999-12-15
+Bosque de Aragón,Línea B,19.4522,-99.0745,Iztapalapa,Bosques de Aragón,1999-12-15
+Villa de Aragón,Línea B,19.4600,-99.0685,Gustavo A. Madero,Villa de Aragón,1999-12-15
+Nezahualcóyotl,Línea B,19.4678,-99.0545,Nezahualcóyotl,Nezahualcóyotl,1999-12-15
+Impulsora,Línea B,19.4739,-99.0440,Nezahualcóyotl,Impulsora,1999-12-15
+Río de los Remedios,Línea B,19.4850,-99.0295,Nezahualcóyotl,Río de los Remedios,1999-12-15
+Múzquiz,Línea B,19.4930,-99.0201,Ecatepec,Múzquiz,1999-12-15
+Ecatepec,Línea B,19.5005,-99.0121,Ecatepec,Ecatepec,1999-12-15
+Olímpica,Línea B,19.5062,-99.0053,Ecatepec,Olímpica,1999-12-15
+Plaza Aragón,Línea B,19.5102,-98.9986,Ecatepec,Plaza Aragón,1999-12-15
+Ciudad Azteca,Línea B,19.4895,-98.9901,Ecatepec,Ciudad Azteca,1999-12-15
+Mixcoac,Línea 12,19.3800,-99.1920,Álvaro Obregón,Mixcoac,2012-10-30
+Insurgentes Sur,Línea 12,19.3745,-99.1798,Benito Juárez,Insurgentes Sur,2012-10-30
+Hospital 20 de Noviembre,Línea 12,19.3841,-99.1622,Benito Juárez,Del Valle,2012-10-30
+Zapata,Línea 12,19.3913,-99.1494,Benito Juárez,Del Valle Centro,2012-10-30
+Parque de los Venados,Línea 12,19.3800,-99.1420,Benito Juárez,Parque de los Venados,2012-10-30
+Eje Central,Línea 12,19.3730,-99.1300,Iztapalapa,Eje Central,2012-10-30
+Ermita,Línea 12,19.3728,-99.1125,Iztapalapa,Ermita,2012-10-30
+Mexicaltzingo,Línea 12,19.3680,-99.0998,Iztapalapa,Mexicaltzingo,2012-10-30
+Atlalilco,Línea 12,19.3693,-99.0928,Iztapalapa,Atlalilco,2012-10-30
+Culhuacán,Línea 12,19.3618,-99.0862,Iztapalapa,Culhuacán,2012-10-30
+San Andrés Tomatlán,Línea 12,19.3512,-99.0795,Iztapalapa,San Andrés Tomatlán,2012-10-30
+Lomas Estrella,Línea 12,19.3428,-99.0728,Iztapalapa,Lomas Estrella,2012-10-30
+Calle 11,Línea 12,19.3356,-99.0673,Iztapalapa,Calle 11,2012-10-30
+Periferico Oriente,Línea 12,19.3273,-99.0618,Iztapalapa,Periférico Oriente,2012-10-30
+Tezonco,Línea 12,19.3188,-99.0552,Iztapalapa,Tezonco,2012-10-30
+Olivos,Línea 12,19.3102,-99.0472,Tláhuac,Olivos,2012-10-30
+Nopalera,Línea 12,19.3027,-99.0380,Tláhuac,Nopalera,2012-10-30
+Zapotitlán,Línea 12,19.2963,-99.0272,Tláhuac,Zapotitlán,2012-10-30
+Tlaltenco,Línea 12,19.2900,-99.0180,Tláhuac,Tlaltenco,2012-10-30
+Tláhuac,Línea 12,19.2970,-99.0115,Tláhuac,Tláhuac,2012-10-30

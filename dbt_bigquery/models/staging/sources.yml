@@ -43,18 +43,23 @@ sources:
       - name: metro_affluence
         description: >
           Daily metro entry counts per (service_date, linea, station_canonical).
-          Partitioned by service_date.
+          Partitioned by service_date. The Spark Silver job reads afluenciastc_simple_*.csv
+          which contains one aggregate daily total per (fecha, linea, estacion) with no
+          payment-type breakdown. tipo_pago is NOT in this table. For payment-type detail
+          the afluenciastc_desglosado CSV would need a separate Silver job.
         columns:
           - name: service_date
             description: Date of the recorded entry count. Hive partition column.
           - name: linea
-            description: Metro line identifier (e.g. L1).
+            description: >
+              Metro line identifier after double-encoded UTF-8 mojibake fix,
+              e.g. "Línea 1". Produced by the Spark _fix_encoding UDF.
           - name: station_raw
-            description: Station name as it appeared in the source CSV.
+            description: Station name as it appeared in the source CSV (before canonicalization).
           - name: station_canonical
             description: Normalised station name after mojibake fix and variant lookup.
           - name: daily_entries
-            description: Total entries recorded for this station on this date.
+            description: Total daily entries for this station and line (all payment types combined).
 
       - name: metrobus_stop_events
         description: >
@@ -76,31 +81,55 @@ sources:
 
       - name: weather_hourly_fact
         description: >
-          Hourly weather observations and derived comfort features for CDMX coordinates.
-          Partitioned by service_date.
+          Hourly weather observations for CDMX in wide format. The Spark job pivots
+          from one row per coordinate to one row per UTC hour, producing per-coordinate
+          columns ({coord}_{metric}) plus city-wide arithmetic averages and derived
+          comfort features. Partitioned by service_date.
+          Coordinates: centro, aeropuerto, pedregal, tlalnepantla, ecatepec.
         columns:
-          - name: coordinate_id
-            description: Identifier for the observation coordinate (lat_lon string).
-          - name: obs_time
-            description: Observation timestamp (hourly, local time string from Open-Meteo).
-          - name: temperature_2m
-          - name: precipitation
-          - name: windspeed_10m
-          - name: relativehumidity_2m
+          - name: obs_timestamp
+            description: >
+              UTC timestamp of the observation hour (TIMESTAMP). This is the
+              parsed form of the Open-Meteo "YYYY-MM-DDTHH:MM" string — the
+              string column is dropped before writing to Parquet.
+          - name: centro_temperature_2m
+          - name: centro_precipitation
+          - name: centro_windspeed_10m
+          - name: centro_relativehumidity_2m
+          - name: aeropuerto_temperature_2m
+          - name: aeropuerto_precipitation
+          - name: aeropuerto_windspeed_10m
+          - name: aeropuerto_relativehumidity_2m
+          - name: pedregal_temperature_2m
+          - name: pedregal_precipitation
+          - name: pedregal_windspeed_10m
+          - name: pedregal_relativehumidity_2m
+          - name: tlalnepantla_temperature_2m
+          - name: tlalnepantla_precipitation
+          - name: tlalnepantla_windspeed_10m
+          - name: tlalnepantla_relativehumidity_2m
+          - name: ecatepec_temperature_2m
+          - name: ecatepec_precipitation
+          - name: ecatepec_windspeed_10m
+          - name: ecatepec_relativehumidity_2m
           - name: avg_temperature_2m
-            description: 24h rolling average temperature.
+            description: Arithmetic mean of temperature_2m across all five coordinates (°C).
           - name: avg_precipitation
+            description: Arithmetic mean of precipitation across all five coordinates (mm).
           - name: avg_windspeed_10m
+            description: Arithmetic mean of windspeed_10m across all five coordinates (m/s).
           - name: avg_relativehumidity_2m
+            description: Arithmetic mean of relative humidity across all five coordinates (%).
           - name: heat_index
+            description: Rothfusz heat index in Celsius applied to city-wide avg temperature and humidity.
           - name: precipitation_flag
-            description: Boolean — true if precipitation > 0.1mm.
+            description: Boolean — true if avg_precipitation > 0.1mm.
           - name: wind_category
-            description: Beaufort-scale category string.
+            description: Simplified Beaufort category (calm / breeze / strong).
           - name: comfort_score
-            description: Composite 0-100 comfort index.
+            description: Composite 0–100 comfort index.
           - name: service_date
-            description: CDMX-local date. Hive partition column.
+            description: UTC date derived from obs_timestamp. Hive partition column.
 
   - name: raw_cdmx
     database: cdmx-mobility-prod

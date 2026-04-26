@@ -1,0 +1,60 @@
+holiday_date,holiday_name,holiday_type
+2021-01-01,Año Nuevo,public
+2021-02-01,Día de la Constitución,public
+2021-03-15,Natalicio de Benito Juárez,public
+2021-05-01,Día del Trabajo,public
+2021-09-16,Día de la Independencia,public
+2021-11-15,Día de la Revolución,public
+2021-12-25,Navidad,public
+2022-01-01,Año Nuevo,public
+2022-02-07,Día de la Constitución,public
+2022-03-21,Natalicio de Benito Juárez,public
+2022-05-01,Día del Trabajo,public
+2022-09-16,Día de la Independencia,public
+2022-11-21,Día de la Revolución,public
+2022-12-25,Navidad,public
+2023-01-01,Año Nuevo,public
+2023-02-06,Día de la Constitución,public
+2023-03-20,Natalicio de Benito Juárez,public
+2023-05-01,Día del Trabajo,public
+2023-09-16,Día de la Independencia,public
+2023-11-20,Día de la Revolución,public
+2023-12-25,Navidad,public
+2024-01-01,Año Nuevo,public
+2024-02-05,Día de la Constitución,public
+2024-03-18,Natalicio de Benito Juárez,public
+2024-05-01,Día del Trabajo,public
+2024-09-16,Día de la Independencia,public
+2024-11-18,Día de la Revolución,public
+2024-12-25,Navidad,public
+2025-01-01,Año Nuevo,public
+2025-02-03,Día de la Constitución,public
+2025-03-17,Natalicio de Benito Juárez,public
+2025-05-01,Día del Trabajo,public
+2025-09-16,Día de la Independencia,public
+2025-11-17,Día de la Revolución,public
+2025-12-25,Navidad,public
+2026-01-01,Año Nuevo,public
+2026-02-02,Día de la Constitución,public
+2026-03-16,Natalicio de Benito Juárez,public
+2026-05-01,Día del Trabajo,public
+2026-09-16,Día de la Independencia,public
+2026-11-16,Día de la Revolución,public
+2026-12-25,Navidad,public
+2027-01-01,Año Nuevo,public
+2027-02-01,Día de la Constitución,public
+2027-03-15,Natalicio de Benito Juárez,public
+2027-05-01,Día del Trabajo,public
+2027-09-16,Día de la Independencia,public
+2027-11-15,Día de la Revolución,public
+2027-12-25,Navidad,public
+2021-09-17,Puente Independencia,bridge
+2022-09-15,Puente Independencia,bridge
+2023-05-02,Puente Día del Trabajo,bridge
+2023-11-21,Puente Revolución,bridge
+2024-02-06,Puente Constitución,bridge
+2025-02-04,Puente Constitución,bridge
+2025-09-15,Puente Independencia,bridge
+2026-05-04,Puente Día del Trabajo,bridge
+2026-09-17,Puente Independencia,bridge
+2027-09-17,Puente Independencia,bridge

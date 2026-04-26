@@ -1,0 +1,230 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Standard date dimension covering 2021-01-01 through 2027-12-31.
+      One row per calendar day. Includes CDMX-specific attributes: Mexican federal
+      holiday flags (from the mexican_holidays seed), quincena pay-cycle flags,
+      and SEP school vacation windows computed via date-range expressions.
+      Materialized as a table (~2,557 rows) to avoid re-evaluating the date spine
+      on every downstream query.
+    columns:
+      - name: date_day
+        description: Calendar date. Primary key of this dimension.
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: Four-digit calendar year (e.g. 2024).
+        tests:
+          - not_null
+      - name: month
+        description: Month number 1–12.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 1
+                max_value: 12
+      - name: day
+        description: Day of month 1–31.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 1
+                max_value: 31
+      - name: day_of_week
+        description: Day of week 1–7 where 1=Sunday and 7=Saturday (BigQuery convention).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 1
+                max_value: 7
+      - name: day_name
+        description: Full English day name (e.g. Monday). BigQuery format_date output.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      - name: month_name
+        description: Full English month name (e.g. January). BigQuery format_date output.
+        tests:
+          - not_null
+      - name: iso_week
+        description: >
+          ISO week number (1–53) where weeks start on Monday. Uses BigQuery
+          EXTRACT(ISOWEEK) — week 1 is the week containing the first Thursday
+          of the year. Preferred over EXTRACT(WEEK) for transport analytics.
+        tests:
+          - not_null
+      - name: quarter
+        description: Calendar quarter 1–4.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 1
+                max_value: 4
+      - name: day_of_year
+        description: Day of year 1–366.
+        tests:
+          - not_null
+      - name: is_first_quincena
+        description: >
+          True for days 1–15 of the month (first pay period). In CDMX payroll
+          cycles, the first quincena payday is the 15th of each month.
+        tests:
+          - not_null
+      - name: is_second_quincena
+        description: >
+          True for days 16 through end-of-month (second pay period). Payday
+          is the last calendar day of the month.
+        tests:
+          - not_null
+      - name: is_quincena_payday
+        description: >
+          True on the 15th of each month or the last calendar day of the month.
+          These are the nominal paydays for CDMX salaried workers. Ridership
+          typically spikes on quincena paydays as workers shop and travel.
+        tests:
+          - not_null
+      - name: is_weekend
+        description: True on Saturday (day_of_week=7) and Sunday (day_of_week=1).
+        tests:
+          - not_null
+      - name: is_weekday
+        description: True Monday through Friday.
+        tests:
+          - not_null
+      - name: is_public_holiday
+        description: >
+          True on Mexican federal mandatory rest days (holiday_type='public').
+          Does not include bridge days — use is_bridge_day for those.
+        tests:
+          - not_null
+      - name: is_bridge_day
+        description: >
+          True on government-declared puentes (bridge days adjacent to a public
+          holiday). Workers typically have these off but they are not legally
+          mandated rest days.
+        tests:
+          - not_null
+      - name: holiday_name
+        description: >
+          Name of the public holiday or bridge day if applicable, NULL otherwise.
+          Sourced from the mexican_holidays seed.
+      - name: is_school_vacation
+        description: >
+          True during SEP school vacation periods: summer (July–August), winter
+          break (December 20–January 6), and Holy Week (14-day window ending on
+          Easter Sunday). Computed via hardcoded date ranges rather than the
+          holidays seed to avoid expanding hundreds of individual vacation days
+          into seed rows. Easter dates used: 2021=Apr-04, 2022=Apr-17,
+          2023=Apr-09, 2024=Mar-31, 2025=Apr-20, 2026=Apr-05, 2027=Mar-28.
+        tests:
+          - not_null
+
+  - name: dim_station
+    description: >
+      Unified station/stop dimension covering all three CDMX transit modes.
+      EcoBici rows come from the SCD2 snapshot (current records only, dbt_valid_to IS NULL).
+      Metro rows come from the metro_station_locations seed — one row per
+      (station_canonical, linea) pair so transfer stations appear on each line.
+      Metrobús rows come from the most recent GTFS static ingest, physical stops
+      only (location_type = 0). station_key is a surrogate key generated from
+      (mode, station_id) for EcoBici/Metrobús and (mode, station_canonical, linea)
+      for Metro to keep transfer stations distinct.
+    columns:
+      - name: station_key
+        description: Surrogate key — MD5 of mode + natural identifier(s). Primary key.
+        tests:
+          - not_null
+          - unique
+      - name: station_id
+        description: >
+          Natural station identifier within its mode: EcoBici station_id (string),
+          metro station_canonical name, or Metrobús stop_id.
+        tests:
+          - not_null
+      - name: station_name
+        description: Human-readable station name.
+        tests:
+          - not_null
+      - name: station_short_name
+        description: Short label — EcoBici short_name, Metrobús stop_code; NULL for Metro.
+      - name: mode
+        description: Transit mode — ecobici, metro, or metrobus.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ecobici', 'metro', 'metrobus']
+      - name: lat
+        description: WGS-84 latitude (approximate).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 19.0
+                max_value: 19.7
+      - name: lon
+        description: WGS-84 longitude (negative, western hemisphere).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -99.4
+                max_value: -98.9
+      - name: geog
+        description: BigQuery GEOGRAPHY point for spatial queries.
+        tests:
+          - not_null
+      - name: capacity
+        description: Number of docks (EcoBici only). NULL for Metro and Metrobús.
+      - name: linea
+        description: Metro line in "Línea N" format (Metro only). NULL for other modes.
+      - name: borough
+        description: Alcaldía (Metro only from seed). NULL for other modes.
+      - name: colonia
+        description: Colonia/neighborhood (Metro only from seed). NULL for other modes.
+      - name: opened_date
+        description: Approximate station opening date (Metro only). NULL for other modes.
+      - name: parent_station_id
+        description: GTFS parent_station stop_id (Metrobús only). NULL for other modes.
+
+  - name: dim_weather_condition
+    description: >
+      Five-row lookup table binning comfort_score (0–100) into named weather
+      conditions. Rows are sourced from the weather_conditions seed. Joins to
+      fact tables via: comfort_score BETWEEN comfort_score_min AND comfort_score_max.
+      Included for Tableau filter dropdowns — the analytical signal lives in the
+      fact tables, not here.
+    columns:
+      - name: condition_id
+        description: Surrogate integer key. Primary key (1 = Severe … 5 = Ideal).
+        tests:
+          - not_null
+          - unique
+      - name: condition_label
+        description: Human-readable label — Severe, Poor, Fair, Good, or Ideal.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Severe', 'Poor', 'Fair', 'Good', 'Ideal']
+      - name: comfort_score_min
+        description: Inclusive lower bound of the bin.
+        tests:
+          - not_null
+      - name: comfort_score_max
+        description: Inclusive upper bound of the bin.
+        tests:
+          - not_null
+      - name: description
+        description: Plain-language summary of conditions and ridership impact.
+        tests:
+          - not_null

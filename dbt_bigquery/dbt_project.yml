@@ -14,6 +14,14 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+seeds:
+  cdmx_mobility:
+    +schema: seeds_cdmx
+
+snapshots:
+  cdmx_mobility:
+    +target_schema: snapshots_cdmx
+
 models:
   cdmx_mobility:
     staging:
@@ -24,3 +32,9 @@ models:
     marts:
       +materialized: table
       +schema: marts_cdmx
+      core:
+        +materialized: table
+        +schema: marts_cdmx
+      mobility:
+        +materialized: table
+        +schema: marts_cdmx

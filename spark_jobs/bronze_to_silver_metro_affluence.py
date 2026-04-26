@@ -46,7 +46,6 @@ from pyspark.sql.functions import col, to_date, udf
 from pyspark.sql.types import IntegerType, StringType
 
 from ingestion.bq_logger import IngestionLogger, RunResult
-from ingestion.config import Settings
 from spark_jobs.conformance.spark_session import get_spark_session
 from spark_jobs.conformance.station_names import canonicalize_station_udf
 
@@ -195,12 +194,17 @@ def run_job(
     is_flag=True,
     help="Run with local[2] master for smoke-testing (no cluster needed)",
 )
-def run(input_path: str, output_path: str, local: bool) -> None:
+@click.option(
+    "--gcp-project-id",
+    envvar="CDMX_GCP_PROJECT_ID",
+    required=True,
+    help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
+)
+def run(input_path: str, output_path: str, local: bool, gcp_project_id: str) -> None:
     """Transform metro affluence Bronze CSVs to Silver Parquet (daily totals)."""
-    settings = Settings()
     spark = get_spark_session("cdmx-metro-affluence-silver", local=local)
     try:
-        run_job(spark, input_path, output_path, settings.gcp_project_id)
+        run_job(spark, input_path, output_path, gcp_project_id)
     finally:
         spark.stop()
 

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import h3
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, monotonically_increasing_id, row_number, udf
-from pyspark.sql.types import IntegerType, StringType
+from pyspark.sql.functions import col, explode, lit, monotonically_increasing_id, row_number, udf
+from pyspark.sql.types import ArrayType, IntegerType, StringType
 from pyspark.sql.window import Window
 
 H3_RESOLUTION: int = 9  # ~174m average edge length
@@ -36,8 +36,15 @@ def _h3_distance(cell_a: str | None, cell_b: str | None) -> int | None:
         return None
 
 
+def _h3_kring(cell: str | None, k: int) -> list[str] | None:
+    if cell is None:
+        return None
+    return list(h3.k_ring(cell, k))
+
+
 lat_lon_to_h3_udf = udf(_lat_lon_to_h3, StringType())
 h3_distance_udf = udf(_h3_distance, IntegerType())
+h3_kring_udf = udf(_h3_kring, ArrayType(StringType()))
 
 
 def register_udfs(spark: SparkSession) -> None:
@@ -95,9 +102,21 @@ def snap_to_nearest_stop(
 
     positions_with_id = positions_df.withColumn(pos_id_col, monotonically_increasing_id())
 
-    joined = positions_with_id.join(
+    # Expand each position cell to its k_ring neighborhood, then explode so
+    # every candidate cell becomes a separate row for the join.
+    # This fixes the original exact-cell join which silently dropped all stops
+    # in neighbouring cells (the _h3_dist filter never ran on those rows).
+    positions_expanded = (
+        positions_with_id.withColumn(
+            "_candidate_cells", h3_kring_udf(col(position_h3_col), lit(max_h3_distance))
+        )
+        .withColumn("_candidate_cell", explode("_candidate_cells"))
+        .drop("_candidate_cells")
+    )
+
+    joined = positions_expanded.join(
         stops_df,
-        on=positions_with_id[position_h3_col] == stops_df[stop_h3_col],
+        on=positions_expanded["_candidate_cell"] == stops_df[stop_h3_col],
         how="inner",
     )
 
@@ -110,7 +129,7 @@ def snap_to_nearest_stop(
     result = (
         joined.withColumn("_rank", row_number().over(w))
         .filter(col("_rank") == 1)
-        .drop(pos_id_col, "_h3_dist", "_rank")
+        .drop(pos_id_col, "_h3_dist", "_rank", "_candidate_cell")
     )
 
     return result

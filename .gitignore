@@ -210,3 +210,8 @@ __marimo__/
 infra/terraform.tfvars
 infra/terraform.tvars
 **/.terraform/
+
+# dbt
+dbt_bigquery/dbt_packages/
+dbt_bigquery/target/
+dbt_bigquery/logs/

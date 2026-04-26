@@ -1,0 +1,388 @@
+version: 2
+
+models:
+  - name: fct_ecobici_station_hourly
+    description: >
+      Hourly EcoBici station availability fact table. One row per (station, hour).
+      Metrics are time-weighted using the duration between consecutive state-change
+      observations (capped at 20 min to handle polling gaps). Partitioned by
+      service_date (CDMX local date), clustered by station_id.
+      Incremental merge re-processes the last 3 days on each run to absorb
+      late-arriving Silver data. For full historical backfill, run with
+      --full-refresh.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - station_id
+              - hour_ts
+    columns:
+      - name: fct_sk
+        description: Surrogate key — MD5 of station_id + hour_ts string.
+        tests:
+          - not_null
+          - unique
+      - name: station_id
+        description: EcoBici station identifier (natural key from GBFS feed).
+        tests:
+          - not_null
+      - name: station_key
+        description: Foreign key to dim_station.station_key.
+      - name: hour_ts
+        description: Hour bucket as TIMESTAMP (truncated to the hour, UTC).
+        tests:
+          - not_null
+      - name: service_date
+        description: CDMX local service date (partition column).
+        tests:
+          - not_null
+      - name: capacity
+        description: Total dock capacity from dim_station (EcoBici snapshot).
+      - name: bikes_available_avg
+        description: Time-weighted average bikes available during the hour.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: bikes_available_min
+        description: Minimum bikes available observed during the hour.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: docks_available_avg
+        description: Time-weighted average docks available during the hour.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: stockout_minutes
+        description: Minutes during the hour where bikes_available = 0 (station empty).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 60
+      - name: full_minutes
+        description: Minutes during the hour where docks_available = 0 (station full).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 60
+      - name: state_changes_count
+        description: Number of state-change observations within the hour.
+        tests:
+          - not_null
+      - name: observed_minutes
+        description: >
+          Sum of weighted observation durations (minutes). May be less than 60
+          near the edges of the data window or after station downtime.
+        tests:
+          - not_null
+      - name: availability_ratio
+        description: >
+          Time-weighted fraction of the hour the station was in is_renting=true
+          state. 1.0 means the station was available for the entire hour.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: fill_ratio
+        description: >
+          bikes_available_avg / capacity — fraction of dock capacity occupied
+          by bikes. NULL when capacity is unknown or zero.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 1
+
+  - name: fct_metro_affluence_daily
+    description: >
+      Daily Metro station ridership fact table. One row per (service_date, linea,
+      station_canonical). Sourced from Silver metro affluence (afluenciastc_simple
+      CSV) which has no payment-type breakdown — daily_entries is the complete
+      daily count for the station-line pair. Partitioned by service_date,
+      clustered by linea and station_canonical. Replaces mart_metro_affluence_daily
+      once Silver data is validated; the old mart remains until deprecation.
+    columns:
+      - name: fct_sk
+        description: Surrogate key — MD5 of service_date + station_canonical + linea.
+        tests:
+          - not_null
+          - unique
+      - name: service_date
+        description: CDMX local service date (partition column).
+        tests:
+          - not_null
+      - name: linea
+        description: Metro line in "Línea N" format (Línea 1–9, A, B, 12).
+        tests:
+          - not_null
+      - name: station_canonical
+        description: Canonical station name matching spark_jobs canonicalization UDF output.
+        tests:
+          - not_null
+      - name: daily_entries
+        description: Total passenger entries for the station-line on this date.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 500000
+      - name: station_key
+        description: >
+          Foreign key to dim_station.station_key. NULL when the station-line pair
+          is not in the metro_station_locations seed.
+      - name: borough
+        description: Alcaldía from dim_station seed (NULL when station_key is NULL).
+      - name: colonia
+        description: Colonia from dim_station seed (NULL when station_key is NULL).
+      - name: day_name
+        description: Full English day name from dim_date (NULL when date outside 2021–2027).
+      - name: is_weekend
+        description: True on Saturday/Sunday (from dim_date).
+      - name: is_weekday
+        description: True Monday–Friday (from dim_date).
+      - name: is_public_holiday
+        description: True on Mexican federal mandatory rest days (from dim_date).
+      - name: is_bridge_day
+        description: True on government-declared puentes (from dim_date).
+      - name: is_quincena_payday
+        description: True on the 15th and last calendar day of the month (from dim_date).
+      - name: is_school_vacation
+        description: True during SEP school vacation windows (from dim_date).
+      - name: holiday_name
+        description: Holiday or bridge day name if applicable, NULL otherwise (from dim_date).
+
+  - name: fct_unified_mobility_hourly
+    description: >
+      Star table joining EcoBici and Metrobús at hourly grain with city-wide
+      weather and date attributes. One row per (mode, station_id, route_id,
+      hour_ts). Metro is daily only and is excluded — it can be joined via
+      service_date to fct_metro_affluence_daily in downstream queries.
+      EcoBici rows carry bike availability metrics (bikes_available_avg,
+      stockout_minutes, fill_ratio, etc.); Metrobús rows carry stop-event
+      metrics (vehicle_count, avg_headway_minutes, etc.). Mode-specific columns
+      are NULL for the other mode. Weather joined at obs_hour; condition label
+      resolved via comfort_score BETWEEN range join to dim_weather_condition.
+      Partitioned by service_date, clustered by mode and station_id.
+    columns:
+      - name: fct_sk
+        description: >
+          Surrogate key — MD5 of (mode, station_id, route_id, hour_ts). route_id
+          is coalesced to '' for EcoBici to keep the key deterministic.
+        tests:
+          - not_null
+          - unique
+      - name: service_date
+        description: CDMX local service date (partition column).
+        tests:
+          - not_null
+      - name: hour_ts
+        description: UTC hour bucket as TIMESTAMP.
+        tests:
+          - not_null
+      - name: mode
+        description: Transit mode — ecobici or metrobus.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ecobici', 'metrobus']
+      - name: station_id
+        description: Natural station identifier within its mode.
+        tests:
+          - not_null
+      - name: station_key
+        description: Foreign key to dim_station.station_key.
+      - name: route_id
+        description: GTFS route_id (Metrobús only). NULL for EcoBici.
+      - name: bikes_available_avg
+        description: Time-weighted average bikes available (EcoBici only).
+      - name: bikes_available_min
+        description: Minimum bikes available observed in the hour (EcoBici only).
+      - name: docks_available_avg
+        description: Time-weighted average docks available (EcoBici only).
+      - name: stockout_minutes
+        description: Minutes the EcoBici station was empty (EcoBici only).
+      - name: full_minutes
+        description: Minutes the EcoBici station was full (EcoBici only).
+      - name: state_changes_count
+        description: Number of state-change observations in the hour (EcoBici only).
+      - name: observed_minutes
+        description: Sum of weighted observation durations in minutes (EcoBici only).
+      - name: availability_ratio
+        description: Time-weighted fraction the EcoBici station was in renting state.
+      - name: fill_ratio
+        description: bikes_available_avg / capacity (EcoBici only).
+      - name: vehicle_count
+        description: Distinct vehicles observed at the stop in the hour (Metrobús only).
+      - name: avg_dwell_minutes
+        description: Average dwell time per stop event in minutes (Metrobús only).
+      - name: avg_headway_minutes
+        description: >
+          Average headway between consecutive vehicle arrivals in minutes
+          (Metrobús only). NULL values excluded from avg (first vehicle of day
+          and gaps > 2 h are NULL in fct_metrobus_stop_events).
+      - name: stop_event_count
+        description: Total stop events at this stop in the hour (Metrobús only).
+      - name: temperature_c
+        description: City-wide average temperature in °C (from Silver weather).
+      - name: humidity_pct
+        description: City-wide average relative humidity in %.
+      - name: precipitation_mm
+        description: City-wide average precipitation in mm.
+      - name: windspeed_ms
+        description: City-wide average wind speed in m/s.
+      - name: heat_index
+        description: Rothfusz heat index in °C (city-wide).
+      - name: comfort_score
+        description: Composite comfort score 0–100 (from Silver derived features).
+      - name: wind_category
+        description: >
+          Beaufort-scale wind category string — calm (< 1.5 m/s), breeze
+          (1.5–10.7 m/s), or strong (≥ 10.7 m/s).
+      - name: is_rainy
+        description: True when avg_precipitation > 0.1 mm threshold.
+      - name: is_adverse_weather
+        description: True when is_rainy, temperature_c >= 35, or wind_category = 'strong'.
+      - name: weather_condition
+        description: >
+          Human-readable condition label from dim_weather_condition (Severe /
+          Poor / Fair / Good / Ideal). NULL when weather data is absent for the
+          hour.
+      - name: day_name
+        description: Full English day name (from dim_date).
+      - name: iso_week
+        description: ISO week number 1–53 (from dim_date).
+      - name: is_weekend
+        description: True on Saturday/Sunday.
+      - name: is_weekday
+        description: True Monday–Friday.
+      - name: is_public_holiday
+        description: True on Mexican federal mandatory rest days.
+      - name: is_bridge_day
+        description: True on government-declared puentes.
+      - name: is_quincena_payday
+        description: True on the 15th and last calendar day of the month.
+      - name: is_school_vacation
+        description: True during SEP school vacation windows.
+      - name: holiday_name
+        description: Holiday or bridge day name if applicable, NULL otherwise.
+
+  - name: fct_metrobus_stop_events
+    description: >
+      Metrobús stop-event fact table. One row per (vehicle, stop, dwell_start_ts).
+      Each row represents a single vehicle dwelling at a stop — derived from
+      Silver metrobus_stop_events (H3 stop-snapping of RT vehicle positions).
+      Includes headway (time since previous vehicle at same stop/route), route
+      metadata from the most-recent GTFS static ingest, stop geometry from
+      dim_station, and date attributes from dim_date. Partitioned by service_date,
+      clustered by route_id.
+    columns:
+      - name: fct_sk
+        description: Surrogate key — MD5 of vehicle_id + stop_id + dwell_start_ts.
+        tests:
+          - not_null
+          - unique
+      - name: service_date
+        description: CDMX local service date (partition column).
+        tests:
+          - not_null
+      - name: obs_hour
+        description: Arrival timestamp truncated to the hour (UTC).
+        tests:
+          - not_null
+      - name: route_id
+        description: GTFS route_id (cluster column).
+        tests:
+          - not_null
+      - name: route_short_name
+        description: Short route label from GTFS static (e.g. "1", "2"). NULL if not in routes feed.
+      - name: route_long_name
+        description: Full route name from GTFS static. NULL if not in routes feed.
+      - name: route_color
+        description: Hex route color from GTFS static. NULL if not provided.
+      - name: trip_id
+        description: GTFS trip_id associated with the vehicle position.
+      - name: vehicle_id
+        description: Vehicle identifier from the GTFS-RT feed.
+        tests:
+          - not_null
+      - name: stop_id
+        description: GTFS stop_id where the vehicle dwelled.
+        tests:
+          - not_null
+      - name: stop_name
+        description: Stop name from the Silver stop-snapping join.
+      - name: stop_sequence
+        description: Stop sequence number within the trip.
+      - name: station_key
+        description: Foreign key to dim_station.station_key. NULL if stop not in static feed.
+      - name: lat
+        description: Stop latitude from dim_station (NULL if station_key is NULL).
+      - name: lon
+        description: Stop longitude from dim_station (NULL if station_key is NULL).
+      - name: geog
+        description: Stop GEOGRAPHY point from dim_station (NULL if station_key is NULL).
+      - name: parent_station_id
+        description: GTFS parent_station stop_id from dim_station (NULL if none).
+      - name: dwell_start_ts
+        description: Timestamp when the vehicle first appeared at this stop.
+        tests:
+          - not_null
+      - name: dwell_end_ts
+        description: Timestamp when the vehicle last appeared at this stop.
+      - name: dwell_seconds
+        description: Total dwell duration in seconds.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 7200
+      - name: dwell_minutes
+        description: dwell_seconds / 60.0.
+      - name: headway_seconds
+        description: >
+          Seconds since the previous vehicle arrived at this stop on the same route
+          and service_date. NULL for the first vehicle of the day or when the gap
+          exceeds 2 hours (data gap or route suspension).
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 7200
+      - name: headway_minutes
+        description: headway_seconds / 60.0. NULL under the same conditions.
+      - name: prev_vehicle_id
+        description: Vehicle ID of the prior arrival (for bus-bunching detection). NULL for first vehicle.
+      - name: prev_arrival_ts
+        description: Arrival timestamp of the prior vehicle. NULL for first vehicle.
+      - name: day_name
+        description: Full English day name (from dim_date).
+      - name: is_weekend
+        description: True on Saturday/Sunday (from dim_date).
+      - name: is_weekday
+        description: True Monday–Friday (from dim_date).
+      - name: is_public_holiday
+        description: True on Mexican federal mandatory rest days (from dim_date).
+      - name: is_bridge_day
+        description: True on government-declared puentes (from dim_date).
+      - name: is_quincena_payday
+        description: True on the 15th and last calendar day of the month (from dim_date).
+      - name: is_school_vacation
+        description: True during SEP school vacation windows (from dim_date).
+      - name: holiday_name
+        description: Holiday or bridge day name if applicable, NULL otherwise (from dim_date).

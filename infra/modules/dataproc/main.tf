@@ -20,7 +20,7 @@ resource "google_storage_bucket_object" "dataproc_init" {
   content = <<-EOT
     #!/bin/bash
     set -euxo pipefail
-    # Propagate timezone to all Spark executor and driver processes
+    # Propagate timezone to Spark executor JVMs.
     echo "TZ=America/Mexico_City" >> /etc/environment
     source /etc/environment
     # Install packages absent from the Dataproc 2.2 base image.
@@ -95,6 +95,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
         "gs://${var.bucket_name}/code/spark_jobs/spark_jobs.zip",
         "gs://${var.bucket_name}/code/spark_jobs/ingestion.zip",
       ]
+      args = ["--gcp-project-id", var.project_id]
     }
   }
 }

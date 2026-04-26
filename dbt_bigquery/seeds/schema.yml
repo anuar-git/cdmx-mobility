@@ -1,0 +1,139 @@
+version: 2
+
+seeds:
+  - name: mexican_holidays
+    description: >
+      Mexican federal mandatory rest days (Días de descanso obligatorio per LFT)
+      and notable government-declared bridge days (puentes) for 2021–2027.
+      School vacation periods (Semana Santa, summer, winter break) are NOT in this
+      seed — they are computed via date-range expressions in dim_date to avoid
+      expanding hundreds of individual vacation days into rows.
+      Constitution Day and Revolution Day are always the 1st and 3rd Monday of
+      February/November respectively (moved to Monday per 2006 LFT reform).
+      Bridge days marked here are officially declared puentes; the list may be
+      incomplete — verify against annual SEGOB/SEP calendar publications.
+    columns:
+      - name: holiday_date
+        description: Calendar date of the holiday or bridge day.
+        tests:
+          - not_null
+          - unique
+      - name: holiday_name
+        description: Human-readable name of the holiday in Spanish.
+        tests:
+          - not_null
+      - name: holiday_type
+        description: >
+          Classification of the holiday. public = federal mandatory rest day per LFT;
+          bridge = government-declared puente connecting a holiday to a weekend.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['public', 'bridge']
+
+  - name: metro_station_locations
+    description: >
+      Reference geometry and metadata for all CDMX Metro stations, one row per
+      (station_canonical, linea) pair. Canonical names match the output of the
+      canonicalize_station UDF in spark_jobs/conformance/station_names.py exactly —
+      stations in METRO_STATION_CANONICAL map to their dict value; all others use
+      the properly-accented name from the most recent CKAN CSV vintage.
+      Transfer stations appear once per line (e.g. Pino Suárez has rows for
+      Línea 1 and Línea 2 with the same coordinates).
+      Coordinates are approximate (within ~300m of actual station entrance) sourced
+      from knowledge of CDMX geography; verify against datos.cdmx.gob.mx Metro
+      station GeoJSON before use in precision-sensitive analyses.
+      linea values use "Línea N" format (with accent) matching the Spark
+      _fix_encoding UDF output from afluenciastc_simple CSV files.
+    columns:
+      - name: station_canonical
+        description: >
+          Canonical station name — the value returned by canonicalize_station UDF.
+          Must match Silver metro_affluence.station_canonical exactly for joins to work.
+        tests:
+          - not_null
+      - name: linea
+        description: >
+          Metro line identifier in "Línea N" format (properly accented, matching
+          the Spark encoding-fixed output). Values: Línea 1 through Línea 9,
+          Línea A, Línea B, Línea 12.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Línea 1'
+                  - 'Línea 2'
+                  - 'Línea 3'
+                  - 'Línea 4'
+                  - 'Línea 5'
+                  - 'Línea 6'
+                  - 'Línea 7'
+                  - 'Línea 8'
+                  - 'Línea 9'
+                  - 'Línea A'
+                  - 'Línea B'
+                  - 'Línea 12'
+      - name: lat
+        description: WGS-84 latitude of the station entrance (approximate).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 19.25
+                max_value: 19.56
+      - name: lon
+        description: WGS-84 longitude of the station entrance (approximate, negative for western hemisphere).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: -99.22
+                max_value: -98.97
+      - name: borough
+        description: Alcaldía (borough) in which the station is located.
+        tests:
+          - not_null
+      - name: colonia
+        description: Colonia (neighborhood) in which the station is located.
+      - name: opened_date
+        description: >
+          Approximate date the station opened to the public. Per-station precision
+          varies — some stations on earlier lines opened years after the initial
+          segment; this field uses the line's initial opening date as a fallback.
+
+  - name: weather_conditions
+    description: >
+      Lookup table binning the continuous comfort_score (0–100) into five
+      human-readable weather condition labels used by dim_weather_condition and
+      Tableau filter dropdowns. Bins are derived from the comfort_score formula
+      in spark_jobs/bronze_to_silver_weather.py:
+        score = 100 − |T − 22| × 3 − precip_flag × 20 − windspeed_ms × 1.5
+      clipped to [0, 100]. Ranges are calibrated to CDMX conditions (altitude
+      ~2240 m, typical temps 10–35 °C, afternoon rainstorms in summer).
+    columns:
+      - name: condition_id
+        description: Surrogate integer key (1 = Severe … 5 = Ideal).
+        tests:
+          - not_null
+          - unique
+      - name: condition_label
+        description: Human-readable label for Tableau filters and dashboard legends.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Severe', 'Poor', 'Fair', 'Good', 'Ideal']
+      - name: comfort_score_min
+        description: Inclusive lower bound of the comfort_score range for this bin.
+        tests:
+          - not_null
+      - name: comfort_score_max
+        description: Inclusive upper bound of the comfort_score range for this bin.
+        tests:
+          - not_null
+      - name: description
+        description: Plain-language description of conditions and expected ridership impact.
+        tests:
+          - not_null
