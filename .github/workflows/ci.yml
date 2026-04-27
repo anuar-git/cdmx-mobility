@@ -59,6 +59,10 @@ jobs:
                 location: US
           EOF
 
+      - name: dbt deps (install dbt packages before parse)
+        working-directory: dbt_bigquery
+        run: uv run dbt deps
+
       - name: dbt parse (validates SQL syntax and DAG without BigQuery connection)
         working-directory: dbt_bigquery
         run: uv run dbt parse
