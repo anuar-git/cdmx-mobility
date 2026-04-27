@@ -104,6 +104,28 @@ resource "google_service_account_iam_member" "github_impersonation" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/anuar-git/cdmx-mobility"
 }
 
+# Allow Cloud Scheduler to mint OAuth tokens for the pipeline SA when calling
+# Dataproc and Cloud Run HTTP targets. Without this, every scheduler job that
+# uses oauthToken with this SA returns HTTP 400 (token creation is denied).
+resource "google_service_account_iam_member" "scheduler_token_creator" {
+  service_account_id = google_service_account.pipeline.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
+}
+
+# Dataproc requires the API caller to have serviceAccountUser on the cluster SA.
+# When the pipeline SA submits a workflow template whose cluster runs as itself,
+# Dataproc checks that the caller can act as that SA — this self-binding satisfies it.
+resource "google_service_account_iam_member" "pipeline_acts_as_self" {
+  service_account_id = google_service_account.pipeline.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.pipeline.email}"
+}
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
 output "service_account_email" {
   value = google_service_account.pipeline.email
 }

@@ -18,6 +18,12 @@ variable "data_bucket_name" {
   default = "cdmx-mobility-raw"
 }
 
+variable "metro_raw_bucket_name" {
+  type        = string
+  description = "GCS bucket for metro affluence Bronze CSVs (separate from the main data bucket)"
+  default     = "cdmx-mobility-raw"
+}
+
 variable "ingestor_image" {
   type        = string
   description = "Container image URI for the ingestor Cloud Run Job"

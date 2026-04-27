@@ -17,6 +17,10 @@ clean-targets:
 seeds:
   cdmx_mobility:
     +schema: seeds_cdmx
+    weather_conditions:
+      +column_types:
+        comfort_score_min: float64
+        comfort_score_max: float64
 
 snapshots:
   cdmx_mobility:

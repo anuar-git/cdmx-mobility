@@ -37,7 +37,12 @@ def run(settings: Settings) -> None:
 
         for resource in csv_resources:
             filename = resource["url"].split("/")[-1]
-            gcs_path = f"metro/affluence/ingestion_date={today}/{filename}"
+            subfolder = (
+                "metro/affluence_desglosado"
+                if "desglosado" in filename.lower()
+                else "metro/affluence_simple"
+            )
+            gcs_path = f"{subfolder}/ingestion_date={today}/{filename}"
             log.info("downloading", resource_name=resource["name"], url=resource["url"])
             data = client.download_resource(resource["url"])
 

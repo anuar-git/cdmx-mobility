@@ -1,7 +1,7 @@
 {{
     config(
         materialized='table',
-        partition_by={'field': 'service_date', 'data_type': 'date'},
+        partition_by={'field': 'service_date', 'data_type': 'date', 'granularity': 'month'},
         cluster_by=['linea', 'station_canonical']
     )
 }}

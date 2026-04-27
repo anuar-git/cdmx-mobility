@@ -1,6 +1,7 @@
 variable "project_id" { type = string }
 variable "location" { type = string }
 variable "raw_bucket_name" { type = string }
+variable "metro_raw_bucket_name" { type = string }
 
 locals {
   datasets = {
@@ -126,6 +127,8 @@ locals {
       { name = "parent_station", type = "STRING", mode = "NULLABLE" },
       { name = "stop_timezone", type = "STRING", mode = "NULLABLE" },
       { name = "wheelchair_boarding", type = "INTEGER", mode = "NULLABLE" },
+      { name = "level_id", type = "STRING", mode = "NULLABLE" },
+      { name = "platform_code", type = "STRING", mode = "NULLABLE" },
       { name = "ingestion_date", type = "DATE", mode = "NULLABLE" },
     ])
     routes = jsonencode([
@@ -138,6 +141,9 @@ locals {
       { name = "route_url", type = "STRING", mode = "NULLABLE" },
       { name = "route_color", type = "STRING", mode = "NULLABLE" },
       { name = "route_text_color", type = "STRING", mode = "NULLABLE" },
+      { name = "route_sort_order", type = "INTEGER", mode = "NULLABLE" },
+      { name = "continuous_pickup", type = "INTEGER", mode = "NULLABLE" },
+      { name = "continuous_drop_off", type = "INTEGER", mode = "NULLABLE" },
       { name = "ingestion_date", type = "DATE", mode = "NULLABLE" },
     ])
     trips = jsonencode([
@@ -203,8 +209,10 @@ resource "google_bigquery_table" "metrobus_static" {
     source_uris   = ["gs://${var.raw_bucket_name}/metrobus/static/${each.key}/*"]
 
     csv_options {
-      quote             = "\""
-      skip_leading_rows = 1
+      quote                 = "\""
+      skip_leading_rows     = 1
+      allow_jagged_rows     = true
+      allow_quoted_newlines = true
     }
 
     hive_partitioning_options {
@@ -238,6 +246,38 @@ resource "google_bigquery_table" "metrobus_vehicle_positions" {
     { name = "vehicle", type = "JSON", mode = "NULLABLE", description = "Full VehiclePosition proto serialised as JSON" },
     { name = "_snapshot_ts", type = "TIMESTAMP", mode = "NULLABLE", description = "UTC wall-clock time of the poll" },
     { name = "ingestion_date", type = "DATE", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "metro_affluence" {
+  dataset_id          = google_bigquery_dataset.datasets["raw_cdmx"].dataset_id
+  table_id            = "metro_affluence"
+  project             = var.project_id
+  deletion_protection = false
+
+  external_data_configuration {
+    source_format = "CSV"
+    autodetect    = false
+    source_uris   = ["gs://${var.metro_raw_bucket_name}/metro/affluence_simple/*"]
+
+    csv_options {
+      quote             = "\""
+      skip_leading_rows = 1
+    }
+
+    hive_partitioning_options {
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${var.metro_raw_bucket_name}/metro/affluence_simple/{ingestion_date:DATE}"
+    }
+  }
+
+  schema = jsonencode([
+    { name = "fecha", type = "STRING", mode = "NULLABLE", description = "Date of the recorded entry count (YYYY-MM-DD)" },
+    { name = "mes", type = "STRING", mode = "NULLABLE", description = "Month name in Spanish" },
+    { name = "anio", type = "INTEGER", mode = "NULLABLE", description = "Year" },
+    { name = "linea", type = "STRING", mode = "NULLABLE", description = "Metro line name (e.g. Linea 1)" },
+    { name = "estacion", type = "STRING", mode = "NULLABLE", description = "Station name" },
+    { name = "afluencia", type = "INTEGER", mode = "NULLABLE", description = "Raw entry count for that station and date" },
   ])
 }
 

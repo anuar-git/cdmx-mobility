@@ -3,4 +3,4 @@ condition_id,condition_label,comfort_score_min,comfort_score_max,description
 2,Poor,20.0,39.9,Uncomfortable — very hot and rainy or extreme heat alone; ridership typically drops
 3,Fair,40.0,59.9,Tolerable but noticeably hot or rainy; moderate ridership impact expected
 4,Good,60.0,79.9,Mild conditions with light rain or slight temperature deviation from ideal
-5,Ideal,80.0,100.0,Comfortable commuting weather for CDMX — near 22 °C, calm, dry
+5,Ideal,80.0,100.0,"Comfortable commuting weather for CDMX — near 22 °C, calm, dry"

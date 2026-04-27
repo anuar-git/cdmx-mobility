@@ -28,7 +28,7 @@ output goes to cdmx-mobility-data/silver/ to keep all Silver data co-located.
 
 Inputs
 ------
-  Bronze: gs://cdmx-mobility-raw/metro/affluence/
+  Bronze: gs://cdmx-mobility-raw/metro/affluence_simple/
           ingestion_date=*/afluenciastc_simple_*.csv
   Columns: fecha (YYYY-MM-DD), anio, mes, linea, estacion, afluencia
 
@@ -53,7 +53,7 @@ _RAW_BUCKET = "cdmx-mobility-raw"
 _DATA_BUCKET = "cdmx-mobility-data"
 
 DEFAULT_INPUT_PATH = (
-    f"gs://{_RAW_BUCKET}/metro/affluence/ingestion_date=*/afluenciastc_simple_*.csv"
+    f"gs://{_RAW_BUCKET}/metro/affluence_simple/ingestion_date=*/afluenciastc_simple_*.csv"
 )
 DEFAULT_OUTPUT_PATH = f"gs://{_DATA_BUCKET}/silver/metro/affluence_daily/"
 

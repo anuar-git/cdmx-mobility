@@ -56,7 +56,7 @@ CDMX_GCP_PROJECT_ID=cdmx-mobility-prod uv run python -m spark_jobs.bronze_to_sil
   --output-path /tmp/silver/ecobici
 
 CDMX_GCP_PROJECT_ID=cdmx-mobility-prod uv run python -m spark_jobs.bronze_to_silver_metro_affluence --local \
-  --input-path "/tmp/bronze/metro/*.csv" \
+  --input-path "/tmp/bronze/metro/affluence_simple/ingestion_date=*/*.csv" \
   --output-path /tmp/silver/metro
 
 CDMX_GCP_PROJECT_ID=cdmx-mobility-prod uv run python -m spark_jobs.bronze_to_silver_weather --local \
@@ -73,13 +73,13 @@ CDMX_GCP_PROJECT_ID=cdmx-mobility-prod uv run python -m spark_jobs.bronze_to_sil
 
 # dbt (run from dbt_bigquery/)
 cd dbt_bigquery/
-uv run dbt build
-uv run dbt run --select stg_metro_affluence
-uv run dbt run --select stg_ecobici_station_status stg_ecobici_station_information
-uv run dbt run --select mart_ecobici_availability_2min
-uv run dbt run --select stg_metrobus_stops stg_metrobus_routes stg_metrobus_vehicle_positions
-uv run dbt run --select mart_metrobus_vehicle_positions_hourly
-uv run dbt test
+uv run dbt deps                                        # install packages first (dbt_date, dbt_expectations, dbt_utils)
+uv run dbt build                                       # full build: seed + run + test
+uv run dbt seed --target prod                          # load reference data to seeds_cdmx
+uv run dbt snapshot --target prod                      # update SCD2 snapshot in snapshots_cdmx
+uv run dbt run --target prod --exclude "example"       # materialize all Gold models
+uv run dbt run --target prod --select fct_ecobici_station_hourly --full-refresh  # full rebuild of incremental model
+uv run dbt test --target prod                          # run all data quality tests
 ```
 
 ## Architecture
@@ -108,10 +108,10 @@ ingestion/metro/            ingestion/metrobus/          ingestion/ecobici/
   │                               │               │               │
   ▼                               ▼               ▼               ▼
 gs://cdmx-mobility-raw/     gs://cdmx-mobility-data/
-  metro/affluence/            metrobus/static/{feed}/ingestion_date=YYYY-MM-DD/
+  metro/affluence_simple/     metrobus/static/{feed}/ingestion_date=YYYY-MM-DD/
   ingestion_date=YYYY-MM-DD/  metrobus/vehicle_positions/ingestion_date=YYYY-MM-DD/
-                              ecobici/station_status/ingestion_ts=YYYY-MM-DDTHH-MM/
-                              ecobici/station_information/ingestion_date=YYYY-MM-DD/
+  metro/affluence_desglosado/ ecobici/station_status/ingestion_ts=YYYY-MM-DDTHH-MM/
+  ingestion_date=YYYY-MM-DD/  ecobici/station_information/ingestion_date=YYYY-MM-DD/
                               ecobici/system_alerts/ingestion_ts=YYYY-MM-DDTHH-MM/
                               weather/hourly/ingestion_date=YYYY-MM-DD/
   │
@@ -124,31 +124,52 @@ spark_jobs/
   │
   ▼  (BigQuery external tables in silver_cdmx)
 dbt_bigquery/models/staging/
-  stg_metro_affluence.sql
-  stg_ecobici_station_{status,information}.sql
+  stg_silver_ecobici_state_changes.sql
+  stg_silver_ecobici_station_master.sql
+  stg_silver_metro_affluence.sql
+  stg_silver_metrobus_stop_events.sql
+  stg_silver_weather_hourly.sql
+  stg_ecobici_station_{status,information}.sql   ← Bronze; feeds legacy mart only
   stg_metrobus_{stops,routes,vehicle_positions}.sql
   │
   ▼
-dbt_bigquery/models/marts/
-  mart_metro_affluence_daily.sql
-  mart_ecobici_availability_2min.sql
-  mart_metrobus_vehicle_positions_hourly.sql   ← partitioned by hour, clustered on route_id
+dbt_bigquery/models/intermediate/
+  int_ecobici_station_hourly_agg.sql    (ephemeral)
+  int_weather_city_hourly.sql           (ephemeral)
   │
   ▼
-Tableau (reads from marts_cdmx)
+dbt_bigquery/models/marts/
+  core/
+    dim_date.sql                        ← 2,555 rows, 7-year calendar with CDMX flags
+    dim_station.sql                     ← 8,011 rows, all EcoBici + Metro + Metrobús stops
+    dim_weather_condition.sql           ← 5 rows, comfort score lookup (seed)
+  mobility/
+    fct_ecobici_station_hourly.sql      ← 1.4M rows, incremental merge, partitioned by service_date
+    fct_metro_affluence_daily.sql       ← 1.16M rows, 2010–2026, partitioned by month
+    fct_metrobus_stop_events.sql        ← 74.6K rows, partitioned by service_date
+    fct_unified_mobility_hourly.sql     ← 1.4M rows, all modes + weather, primary Tableau source
+  mart_ecobici_availability_2min.sql    ← 2.5M rows, legacy 2-min snapshot mart
+  mart_metrobus_vehicle_positions_hourly.sql ← 159K rows, legacy hourly mart
+  │
+  ▼
+snapshots_cdmx/
+  ecobici_station_snapshot             ← 7.4K rows, SCD2 station history
+  │
+  ▼
+Tableau (reads from marts_cdmx — primary table: fct_unified_mobility_hourly)
 ```
 
 **Modules:**
 - [ingestion/](ingestion/) — HTTP ingestors. Config via Pydantic settings (`ingestion/config.py`, `CDMX_` env prefix). Primitives: `CKANClient`, `GBFSClient`, `GCSUploader`, `IngestionLogger` / `RunResult` (BQ metadata), `validate_csv_header` / `validate_gbfs_envelope` (schema validation).
-- [ingestion/metro/](ingestion/metro/) — Metro affluence ingestor. One-shot batch, runs in CI daily cron (06:00 CDMX). CKAN dataset: `afluencia-diaria-del-metro-cdmx`; CSV columns: `fecha, linea, estacion, tipo_pago, afluencia`. Exits cleanly with `status=skipped` when `datos.cdmx.gob.mx` is unreachable (GCP/GitHub IPs are intermittently blocked). Dictionary resources are filtered before upload.
+- [ingestion/metro/](ingestion/metro/) — Metro affluence ingestor. One-shot batch, runs in CI daily cron (06:00 CDMX). CKAN dataset: `afluencia-diaria-del-metro-cdmx`. Uploads `afluenciastc_simple_*.csv` to `metro/affluence_simple/` and `afluenciastc_desglosado_*.csv` to `metro/affluence_desglosado/` — separate GCS prefixes so BigQuery external tables can use a single wildcard per table. Exits cleanly with `status=skipped` when `datos.cdmx.gob.mx` is unreachable.
 - [ingestion/ecobici/](ingestion/ecobici/) — EcoBici GBFS ingestor (`station_status`, `station_information`, `system_alerts`). Cloud Run Job every 10 minutes.
 - [ingestion/metrobus/](ingestion/metrobus/) — Three ingestors:
   - `gtfs_static.py` — Reads the most recent static GTFS ZIP from `metrobus/gtfs_static_email/` in GCS (archived by the webhook), unpacks 6 standard feeds, uploads each as CSV to `metrobus/static/{feed}/`. No longer calls CKAN. Cloud Run Job daily at 04:00.
-  - `gtfs_rt.py` — Polling daemon code (not deployed). Retained in the repo if a direct SEMOVI GTFS-RT URL is ever obtained; would need a new Cloud Run Service resource added to Terraform.
+  - `gtfs_rt.py` — Polling daemon code (not deployed). Retained in the repo if a direct SEMOVI GTFS-RT URL is ever obtained.
   - `inbound_webhook.py` — FastAPI service receiving GTFS data from sinopticoplus via SendGrid inbound parse. Cloud Run Service (`metrobus-gtfs-inbound`, public ingress). Processes RT `.proto` files → NDJSON + raw `.pb` to GCS. Also archives the static GTFS ZIP (`Metrobus_GTFS_ESTATICO.zip`) once per day with a dedup check. **Active source for both RT vehicle positions and static GTFS.**
 - [spark_jobs/](spark_jobs/) — Four PySpark Bronze→Silver jobs running on ephemeral Dataproc clusters. Each job accepts `--input-path`, `--output-path`, and `--local` (local[2] for smoke tests). Imports from `ingestion/` for BQ logging; must be invoked as `python -m spark_jobs.<job>` to resolve imports correctly.
   - `conformance/` — Shared utilities: `spark_session.py`, `time_utils.py` (UTC→CDMX service_date), `station_names.py` (metro station name canonicalization), `h3_utils.py` (spatial stop snapping).
-- [dbt_bigquery/](dbt_bigquery/) — SQL transformations. Source `raw_cdmx` → staging views → marts tables. `silver_cdmx` source registered in `sources.yml` but no dbt models consume it yet (Silver→Gold dbt layer is not implemented). Profile in `~/.dbt/profiles.yml`; dev target writes to `*_dev` datasets.
+- [dbt_bigquery/](dbt_bigquery/) — SQL transformations. Silver→Gold layer is fully implemented and live. Sources: `raw_cdmx` (Bronze) and `silver_cdmx` (Silver Parquet). `generate_schema_name` macro in `macros/` ensures prod writes to clean dataset names (`staging_cdmx`, `marts_cdmx`, etc.) without target prefix. Profile in `~/.dbt/profiles.yml`; dev target writes to `*_dev` datasets.
 - [orchestration/](orchestration/) — Pipeline scheduling (placeholder).
 - [infra/](infra/) — Terraform modules for all GCP resources (see Infrastructure section).
 - [docs/](docs/) — `cost-estimates.md` (~$58/month steady state), `adr/002-spark-for-bronze-to-silver.md`.
@@ -190,30 +211,34 @@ Four Bronze→Silver jobs in `spark_jobs/`. Each follows the same pattern: read 
 | Job | Input | Output | Partition |
 |---|---|---|---|
 | `bronze_to_silver_ecobici.py` | `ecobici/station_status/` + `station_information/` | `silver/ecobici/state_changes/` + `station_master/` | `service_date` |
-| `bronze_to_silver_metro_affluence.py` | `metro/affluence/` (raw bucket) | `silver/metro/affluence_daily/` | `service_date` |
+| `bronze_to_silver_metro_affluence.py` | `metro/affluence_simple/` (raw bucket) | `silver/metro/affluence_daily/` | `service_date` |
 | `bronze_to_silver_metrobus_vehicles.py` | `metrobus/vehicle_positions/` + `metrobus/static/stops/` | `silver/metrobus/stop_events/` | `service_date`, `route_id` |
 | `bronze_to_silver_weather.py` | `weather/hourly/` | `silver/weather/hourly_fact/` | `service_date` |
 
 **Key design notes:**
 - EcoBici deduplication: `lag()` window over `(station_id ORDER BY snapshot_ts)` keeps only rows where at least one field changed (~6-9× compression).
-- Metro affluence schema: CSV is broken down by `tipo_pago` (Boleto/Prepago/Gratuidad) — not a single daily total. Sum `daily_entries` across `tipo_pago` for total station entries.
+- Metro affluence: the `afluenciastc_simple_*.csv` file contains one aggregate daily total per `(fecha, linea, estacion)` — no payment-type breakdown. The `afluenciastc_desglosado_*.csv` (7 columns: fecha, mes, anio, linea, estacion, tipo_pago, afluencia) is archived to `metro/affluence_desglosado/` but has no Silver pipeline yet. BigQuery does not support two wildcards in a single external table URI, which is why simple and desglosado files must be in separate GCS prefixes.
 - Metrobús stop snapping: H3 resolution 9 (~174 m hexagons) inner-joins positions to stops; dwell sessions are contiguous at-stop observations with gap ≤ 60s and duration ≥ 30s.
 - Weather: Open-Meteo hourly arrays are pivoted from one row per coordinate to one row per UTC hour with 5 × 4 coordinate columns + city-wide averages + derived features (Rothfusz heat index, comfort score, Beaufort wind category).
-- **Weather per-zone (not yet implemented):** Silver `weather_hourly_fact` contains 20 per-coordinate columns named `{coord}_{metric}` (e.g. `centro_temperature_2m`, `norte_windspeed_10m`). The four coordinate names (`centro`, `norte`, `sur`, `oriente` — or whatever is hardcoded in `spark_jobs/bronze_to_silver_weather.py`) map to approximate lat/lon centroids for each city quadrant. The dbt layer currently only uses the city-wide `avg_*` columns via `stg_silver_weather_hourly.sql`. To link weather zones to stations: (1) expose per-coordinate columns in a new `stg_silver_weather_per_coordinate.sql`; (2) build a `dim_weather_zone` seed mapping coord name → bounding box or centroid lat/lon; (3) assign each station in `dim_station` to its nearest weather zone using `ST_DISTANCE(station.geog, zone.geog)` or a bounding-box filter; (4) join `fct_unified_mobility_hourly` on `(obs_hour, weather_zone)` instead of `obs_hour` alone.
-- **`wind_category` is a STRING**, not an integer: values are `'calm'` (< 1.5 m/s, Beaufort 0–1), `'breeze'` (1.5–10.7 m/s, Beaufort 1–5), `'strong'` (≥ 10.7 m/s, Beaufort 6+). Use `wind_category = 'strong'` in SQL, not `wind_category >= 6`.
+- **Weather per-zone (not yet implemented):** Silver `weather_hourly_fact` contains 20 per-coordinate columns named `{coord}_{metric}` (e.g. `centro_temperature_2m`, `norte_windspeed_10m`). The dbt layer currently only uses city-wide `avg_*` columns. To link weather zones to stations: (1) expose per-coordinate columns in a new `stg_silver_weather_per_coordinate.sql`; (2) build a `dim_weather_zone` seed; (3) assign each station in `dim_station` to its nearest zone using `ST_DISTANCE`; (4) join `fct_unified_mobility_hourly` on `(obs_hour, weather_zone)`.
+- **`wind_category` is a STRING**, not an integer: values are `'calm'` (< 1.5 m/s), `'breeze'` (1.5–10.7 m/s), `'strong'` (≥ 10.7 m/s). Use `wind_category = 'strong'` in SQL, not `wind_category >= 6`.
 - `_silver_stats()` returns `(0, 0)` for local paths — avoids GCS API calls in `--local` mode.
 - ADR: `docs/adr/002-spark-for-bronze-to-silver.md` documents the choice of Spark over BigQuery SQL and plain Parquet over Delta Lake.
 
 ## dbt
 
 - `dbt_project.yml` is at `dbt_bigquery/` root.
-- Model layers: `staging/` → views in `staging_cdmx`, `intermediate/` → ephemeral, `marts/` → tables in `marts_cdmx`.
-- Source definitions live in `dbt_bigquery/models/staging/sources.yml`. Two sources: `raw_cdmx` (Bronze external tables) and `silver_cdmx` (Silver Parquet external tables — registered but not yet consumed by any model).
+- Model layers: `staging/` → views in `staging_cdmx`, `intermediate/` → ephemeral, `marts/` → tables in `marts_cdmx`, seeds → `seeds_cdmx`, snapshots → `snapshots_cdmx`.
+- The `generate_schema_name` macro in `macros/` controls dataset naming: in prod it uses the custom schema name directly (e.g. `staging_cdmx`); in dev it prepends the target schema (e.g. `dev_staging_cdmx`). Without this macro dbt default behaviour would create `marts_cdmx_staging_cdmx` etc. in prod.
+- Always run `dbt deps` before `dbt parse` or `dbt build` — packages (`dbt_date`, `dbt_expectations`, `dbt_utils`) must be installed first.
+- Sources: `raw_cdmx` (Bronze external tables — EcoBici, Metrobús static + RT) and `silver_cdmx` (Silver Parquet external tables). Metro affluence Bronze source (`raw_cdmx.metro_affluence`) exists in BigQuery but is not consumed by any dbt model — the Gold layer reads Silver only.
+- `fct_ecobici_station_hourly` is an incremental model using `merge` strategy on `(station_id, hour_ts)`. It deduplicates with `QUALIFY ROW_NUMBER()` to handle the edge case where the same `obs_hour` spans two `service_date` values at the CDMX midnight boundary. Use `--full-refresh` when rebuilding from scratch.
+- `fct_metro_affluence_daily` uses monthly partition granularity (`granularity: 'month'`) — the Silver dataset covers 2010–2026 (~5,800 days), which would exceed BigQuery's 4,000-partition limit with daily granularity. Monthly gives ~195 partitions.
+- The `mart_ecobici_availability_2min` and `mart_metrobus_vehicle_positions_hourly` are legacy marts kept for backwards compatibility. The canonical Gold tables are the `fct_*` models.
 - EcoBici staging uses `JSON_QUERY_ARRAY(data, '$.stations') + UNNEST` to explode the GBFS stations array out of the native BigQuery `JSON` column.
 - Metrobús vehicle positions staging uses `json_value(vehicle, '$.path')` and `safe_cast()` to extract fields from the NDJSON `vehicle` JSON column.
-- The `mart_metrobus_vehicle_positions_hourly` mart is partitioned by `hour` (TIMESTAMP, hourly granularity) and clustered on `route_id` to support Tableau route-level filtering efficiently.
 - Run dbt commands from inside `dbt_bigquery/`.
-- **Weather zone granularity:** `int_weather_city_hourly` and all downstream models use city-wide `avg_*` columns. Per-zone weather (linking each station to its nearest Open-Meteo coordinate quadrant) is not yet implemented — see the Spark Jobs section for the full implementation path.
+- **Weather zone granularity:** `int_weather_city_hourly` and all downstream models use city-wide `avg_*` columns. Per-zone weather is not yet implemented — see the Spark Jobs section for the full implementation path.
 
 ## SQL Linting
 
@@ -244,21 +269,21 @@ terraform apply -var-file="terraform.tvars"
   - `staging/` prefix: delete after 7 days
   - `metrobus/vehicle_positions_raw/` prefix: move to NEARLINE after 30 days (high-volume protobuf)
   - `silver/` prefix: move to NEARLINE after 180 days
-- `module.bigquery` — 5 datasets + external and native tables:
-  - `raw_cdmx`: EcoBici (3 NDJSON tables), Metrobús static (6 CSV tables via `for_each`), Metrobús RT (1 NDJSON table)
-  - `silver_cdmx`: 5 Parquet external tables (`ecobici_state_changes`, `ecobici_station_master`, `metro_affluence`, `metrobus_stop_events`, `weather_hourly_fact`) — `autodetect=false`, explicit schemas, CUSTOM Hive partitioning. Safe to apply before any Parquet files exist.
-  - `meta_cdmx`: `ingestion_log` native table, DAY-partitioned on `ingested_at`. Written by every ingestor and Spark job run.
-  - `staging_cdmx`, `marts_cdmx`: dbt targets
-- `module.iam` — service account `cdmx-pipeline-sa`, WIF pool for GitHub Actions
+- `module.bigquery` — datasets + external and native tables. Accepts two bucket variables: `raw_bucket_name` (`cdmx-mobility-data`) and `metro_raw_bucket_name` (`cdmx-mobility-raw`):
+  - `raw_cdmx`: EcoBici (3 NDJSON tables), Metrobús static (6 CSV tables via `for_each` — `allow_jagged_rows=true`, `allow_quoted_newlines=true`), Metrobús RT (1 NDJSON table), metro affluence simple (1 CSV table pointing to `metro/affluence_simple/`)
+  - `silver_cdmx`: 5 Parquet external tables (`ecobici_state_changes`, `ecobici_station_master`, `metro_affluence`, `metrobus_stop_events`, `weather_hourly_fact`) — `autodetect=false`, explicit schemas, CUSTOM Hive partitioning.
+  - `meta_cdmx`: `ingestion_log` native table, DAY-partitioned on `ingested_at`.
+  - `staging_cdmx`, `marts_cdmx`, `seeds_cdmx`, `snapshots_cdmx`: dbt targets
+- `module.iam` — service account `cdmx-pipeline-sa`, WIF pool for GitHub Actions. Includes two bindings required for Dataproc scheduling: Cloud Scheduler service agent has `roles/iam.serviceAccountTokenCreator` on the pipeline SA; the pipeline SA has `roles/iam.serviceAccountUser` on itself (required for Dataproc cluster creation).
 - `module.cloudrun` — Artifact Registry repo `ingestor` + Cloud Run resources:
   - Job `ecobici-ingest` — triggered by Cloud Scheduler every 10 min
   - Job `metrobus-gtfs-static` — triggered by Cloud Scheduler daily 04:00
   - Job `metrobus-gtfs-email-ingest` — triggered by Cloud Scheduler every 5 min (polls for new sinopticoplus emails)
   - Job `weather-ingest` — triggered by Cloud Scheduler daily 02:00
   - Service `metrobus-gtfs-inbound` — public ingress, receives GTFS NDJSON from SendGrid webhook
-- `module.scheduler` — 7 Cloud Scheduler jobs (ecobici poll, metrobus static, metrobus email, weather, + 4 Spark Silver jobs)
+- `module.scheduler` — 7 Cloud Scheduler jobs (ecobici poll, metrobus static, metrobus email, weather, + 4 Spark Silver jobs). Spark Silver jobs are staggered to prevent concurrent cluster creation (quota limit: 10 vCPUs across all regions): weather 04:00, metro 06:00, ecobici 06:30, metrobus 07:00.
 - `module.secrets` — Secret Manager secrets
-- `module.dataproc` — 4 Dataproc workflow templates (`cdmx-spark-ecobici`, `cdmx-spark-metro`, `cdmx-spark-metrobus`, `cdmx-spark-weather`), each with an ephemeral 1 master + 3 workers n1-standard-4 cluster. Spark job `.py` files and `conformance.zip` are uploaded to GCS by CI on every push to `main`.
+- `module.dataproc` — 4 Dataproc workflow templates (`cdmx-spark-ecobici`, `cdmx-spark-metro`, `cdmx-spark-metrobus`, `cdmx-spark-weather`), each with an ephemeral 1 master + 3 workers **n1-standard-2** cluster (8 vCPUs total — fits within the 10-vCPU `CPUS_ALL_REGIONS` project quota). Spark job `.py` files and `spark_jobs.zip` / `ingestion.zip` are uploaded to GCS by CI on every push to `main`.
 
 ## Container Image
 
@@ -303,15 +328,16 @@ Jobs:
 - `gcp-auth-smoke-test` — WIF auth verification. Push to main only.
 - `ingest-metro` — runs metro affluence ingestor on every push to main and on the daily schedule. Exits 0 on `ConnectTimeout`/`ConnectError` (logs `status=skipped` to BQ) because `datos.cdmx.gob.mx` intermittently blocks GitHub Actions IPs.
 - `build-and-push` — builds and pushes Docker image; also uploads `spark_jobs/*.py` and `conformance.zip` to `gs://cdmx-mobility-data/code/spark_jobs/`. Push to main only, after `lint-and-test`. **Does NOT automatically redeploy Cloud Run services/jobs** — Cloud Run resolves `:latest` at deploy time, not at image push time. After CI, manually run `gcloud run services update metrobus-gtfs-inbound --image=...` and `gcloud run jobs update <job> --image=...` to roll out the new image, or make a Terraform change that touches the resource (which forces redeployment as a side effect).
+- `dbt parse` step in CI requires `dbt deps` to run first — packages must be installed before parsing.
 
 Required GitHub secrets: `WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`.
 
 ## Live Data Status
 
-**Metro affluence** — one Bronze partition exists from a manual local run on 2026-04-18 (uploaded via `gcloud auth application-default login`, not CI). The GCS object ACL shows `anuar.hage@gmail.com` as uploader. Subsequent CI runs exit with `status=skipped` due to CKAN connectivity. No BQ ingestion log entry for the successful run (table wasn't provisioned yet). The CSV is a cumulative dump covering 2021-01-01 → 2026-03-31.
+**Metro affluence** — one Bronze partition ingested 2026-04-18. The CSV is a cumulative historical dump covering 2010-01-01 → 2026-03-31 (1.16M rows after Silver processing). Simple file is at:
 ```
-gs://cdmx-mobility-raw/metro/affluence/ingestion_date=2026-04-18/afluenciastc_simple_03_2026.csv
-gs://cdmx-mobility-raw/metro/affluence/ingestion_date=2026-04-18/afluenciastc_desglosado_03_2026.csv
+gs://cdmx-mobility-raw/metro/affluence_simple/ingestion_date=2026-04-18/afluenciastc_simple_03_2026.csv
+gs://cdmx-mobility-raw/metro/affluence_desglosado/ingestion_date=2026-04-18/afluenciastc_desglosado_03_2026.csv
 ```
 
 **EcoBici** — live since 2026-04-17. Cloud Run Job every 10 min via Cloud Scheduler.
@@ -321,13 +347,13 @@ gs://cdmx-mobility-data/ecobici/station_information/ingestion_date=YYYY-MM-DD/st
 gs://cdmx-mobility-data/ecobici/system_alerts/ingestion_ts=YYYY-MM-DDTHH-MM/system_alerts.json
 ```
 
-**Metrobús vehicle positions** — accumulating via the sinopticoplus email ingest path since 2026-04-19. The `metrobus-gtfs-email-ingest` Cloud Run Job polls every 5 min; `metrobus-gtfs-inbound` receives the webhook.
+**Metrobús vehicle positions** — accumulating via the sinopticoplus email ingest path since 2026-04-19.
 ```
 gs://cdmx-mobility-data/metrobus/vehicle_positions/ingestion_date=YYYY-MM-DD/
 gs://cdmx-mobility-data/metrobus/vehicle_positions_raw/ingestion_date=YYYY-MM-DD/
 ```
 
-**Metrobús GTFS static** — sinopticoplus email delivers `Metrobus_GTFS_ESTATICO.zip` alongside the RT file. As of 2026-04-23 the webhook now archives the ZIP to GCS once per day. The `metrobus-gtfs-static` Cloud Run Job reads the most recent ZIP from GCS and unpacks it (no longer calls CKAN). First correctly-named ZIP expected after the filename-fix deploy (2026-04-23).
+**Metrobús GTFS static** — sinopticoplus email delivers `Metrobus_GTFS_ESTATICO.zip` alongside the RT file. Static GTFS CSVs available from 2026-04-24 onwards.
 ```
 gs://cdmx-mobility-data/metrobus/gtfs_static_email/ingestion_date=YYYY-MM-DD/Metrobus_GTFS_ESTATICO.zip
 gs://cdmx-mobility-data/metrobus/static/{feed}/ingestion_date=YYYY-MM-DD/{feed}.csv
@@ -338,13 +364,29 @@ gs://cdmx-mobility-data/metrobus/static/{feed}/ingestion_date=YYYY-MM-DD/{feed}.
 gs://cdmx-mobility-data/weather/hourly/ingestion_date=YYYY-MM-DD/weather_*.json
 ```
 
-**Silver** — not yet written to GCS. Dataproc workflow templates are provisioned and Cloud Scheduler jobs exist, but no template has been manually instantiated yet. Local smoke tests passed 2026-04-23 for EcoBici, Metro, and Weather. Metrobús smoke test was blocked pending static stops CSV — now unblocked once the first `metrobus-gtfs-static` job runs successfully against the email-archived ZIP.
-
-To trigger the first Dataproc Silver run manually:
-```bash
-gcloud dataproc workflow-templates instantiate cdmx-spark-ecobici \
-  --region=us-central1 --project=cdmx-mobility-prod
+**Silver** — live as of 2026-04-27. All four Spark jobs have run successfully. Silver data is in BigQuery via external tables in `silver_cdmx`.
 ```
+gs://cdmx-mobility-data/silver/ecobici/state_changes/service_date=YYYY-MM-DD/
+gs://cdmx-mobility-data/silver/ecobici/station_master/
+gs://cdmx-mobility-data/silver/metro/affluence_daily/service_date=YYYY-MM-DD/   (2010–2026)
+gs://cdmx-mobility-data/silver/metrobus/stop_events/service_date=YYYY-MM-DD/route_id=*/
+gs://cdmx-mobility-data/silver/weather/hourly_fact/service_date=YYYY-MM-DD/
+```
+
+**Gold** — fully materialized as of 2026-04-27. All 19 dbt models pass. Primary Tableau source is `marts_cdmx.fct_unified_mobility_hourly`.
+
+| Table | Rows | Notes |
+|---|---|---|
+| `dim_date` | 2,555 | 7-year calendar, CDMX holiday + quincena flags |
+| `dim_station` | 8,011 | EcoBici + Metro + Metrobús stops, GEOGRAPHY column |
+| `dim_weather_condition` | 5 | Comfort score band lookup |
+| `fct_ecobici_station_hourly` | 1.4M | Incremental merge; `--full-refresh` to rebuild |
+| `fct_metro_affluence_daily` | 1.16M | 2010–2026, monthly partitions |
+| `fct_metrobus_stop_events` | 74.6K | Dwell events with headway |
+| `fct_unified_mobility_hourly` | 1.4M | All modes + weather, primary Tableau table |
+| `mart_ecobici_availability_2min` | 2.5M | Legacy Bronze mart |
+| `mart_metrobus_vehicle_positions_hourly` | 159K | Legacy Bronze mart |
+| `ecobici_station_snapshot` | 7.4K | SCD2 station history |
 
 Check scheduler and job health:
 ```bash
@@ -360,4 +402,8 @@ gcloud run jobs executions list --job=metrobus-gtfs-static --project=cdmx-mobili
 # BQ ingestion log — recent runs
 bq query --project_id=cdmx-mobility-prod --use_legacy_sql=false \
   'SELECT source, status, ingested_at FROM meta_cdmx.ingestion_log ORDER BY ingested_at DESC LIMIT 20'
+
+# Trigger a Dataproc Silver job manually
+gcloud dataproc workflow-templates instantiate cdmx-spark-ecobici \
+  --region=us-central1 --project=cdmx-mobility-prod
 ```

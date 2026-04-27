@@ -135,23 +135,6 @@ sources:
     database: cdmx-mobility-prod
     schema: raw_cdmx
     tables:
-      - name: metro_affluence
-        description: >
-          External table over GCS files at
-          gs://cdmx-mobility-raw/metro/affluence/ingestion_date=YYYY-MM-DD/.
-          Partitioned by ingestion_date (Hive-style).
-        columns:
-          - name: fecha
-            description: Date of the recorded entry count.
-          - name: linea
-            description: Metro line name (e.g. Linea 1).
-          - name: estacion
-            description: Station name.
-          - name: afluencia
-            description: Raw entry count for that station and date.
-          - name: ingestion_date
-            description: Hive partition column — date the file was landed in GCS.
-
       - name: ecobici_station_status
         description: >
           External table over GCS GBFS station_status.json snapshots polled every 2 minutes.

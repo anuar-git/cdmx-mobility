@@ -111,9 +111,8 @@ models:
       Daily Metro station ridership fact table. One row per (service_date, linea,
       station_canonical). Sourced from Silver metro affluence (afluenciastc_simple
       CSV) which has no payment-type breakdown — daily_entries is the complete
-      daily count for the station-line pair. Partitioned by service_date,
-      clustered by linea and station_canonical. Replaces mart_metro_affluence_daily
-      once Silver data is validated; the old mart remains until deprecation.
+      daily count for the station-line pair. Partitioned by service_date (monthly
+      granularity), clustered by linea and station_canonical.
     columns:
       - name: fct_sk
         description: Surrogate key — MD5 of service_date + station_canonical + linea.
