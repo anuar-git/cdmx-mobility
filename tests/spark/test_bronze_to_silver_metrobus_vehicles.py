@@ -87,8 +87,8 @@ def test_load_positions_extracts_fields(spark: SparkSession, tmp_path):
     row = df.collect()[0]
     assert row.vehicle_id == "V1"
     assert row.route_id == "R1"
-    assert row.trip_id == "T1"
-    assert row.stop_sequence == 3
+    assert row.trip_id is None  # sinopticoplus feed omits trip_id
+    assert row.stop_sequence is None  # sinopticoplus feed omits stop_sequence
     assert abs(row.latitude - 19.4326) < 1e-4
     assert abs(row.longitude - (-99.1332)) < 1e-4
     assert row.position_h3 is not None
