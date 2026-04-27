@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # required for peaceiris/actions-gh-pages push
+      id-token: write   # required for google-github-actions/auth WIF
 
     steps:
       - uses: actions/checkout@v4
