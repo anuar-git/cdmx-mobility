@@ -51,13 +51,13 @@ module "scheduler" {
   metrobus_email_job_name  = module.cloudrun.metrobus_email_job_name
   weather_ingest_job_name  = module.cloudrun.weather_ingest_job_name
   service_account_email    = module.iam.service_account_email
+  # spark_workflow_schedules removed: Airflow (module.airflow_vm) owns Dataproc triggers.
+}
 
-  # Staggered 30-min intervals so only one Dataproc cluster runs at a time.
-  # CPUS_ALL_REGIONS quota is 10; each cluster uses 8 vCPUs (n1-standard-2 × 4 nodes).
-  spark_workflow_schedules = {
-    weather  = { template_id = module.dataproc.workflow_template_ids["weather"], schedule = "0 4 * * *" }
-    metro    = { template_id = module.dataproc.workflow_template_ids["metro"], schedule = "0 6 * * *" }
-    ecobici  = { template_id = module.dataproc.workflow_template_ids["ecobici"], schedule = "30 6 * * *" }
-    metrobus = { template_id = module.dataproc.workflow_template_ids["metrobus"], schedule = "0 7 * * *" }
-  }
+module "airflow_vm" {
+  source     = "./modules/airflow_vm"
+  project_id = var.project_id
+  region     = var.region
+  zone       = "${var.region}-a"
+  repo_url   = "https://github.com/anuar-git/cdmx-mobility.git"
 }

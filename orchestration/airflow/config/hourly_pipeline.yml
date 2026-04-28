@@ -1,0 +1,25 @@
+dag_id: hourly_realtime_pipeline
+# :05 past every hour — gives the continuous EcoBici Cloud Scheduler job
+# (every 10 min) time to land at least one snapshot before Spark fires.
+schedule: "5 * * * *"
+start_date: "2026-04-18"
+catchup: false
+max_active_runs: 2
+
+default_args:
+  retries: 1
+  retry_delay_minutes: 2
+
+gcp_project: cdmx-mobility-prod
+gcs_data_bucket: cdmx-mobility-data
+region: us-central1
+
+cloud_run_job: ecobici-ingest
+dataproc_template: cdmx-spark-ecobici
+
+# Sensor: wait for at least one snapshot in the current hour.
+# Probes for the prefix ingestion_ts=<YYYY-MM-DD>T<HH>
+ecobici_sensor_poke_interval_seconds: 60
+ecobici_sensor_timeout_seconds: 900
+
+dbt_selector: fct_ecobici_station_hourly

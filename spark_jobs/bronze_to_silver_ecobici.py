@@ -73,6 +73,26 @@ DEFAULT_STATE_CHANGES_OUTPUT = f"gs://{_BUCKET}/silver/ecobici/state_changes/"
 DEFAULT_STATION_MASTER_OUTPUT = f"gs://{_BUCKET}/silver/ecobici/station_master/"
 
 
+def _status_input_for_date(input_date: str | None) -> str:
+    """Return a date-scoped status glob when input_date is given."""
+    if input_date:
+        # EcoBici uses ingestion_ts=YYYY-MM-DDTHH-MM — probe the date prefix.
+        return (
+            f"gs://{_BUCKET}/ecobici/station_status/ingestion_ts={input_date}T*/station_status.json"
+        )
+    return DEFAULT_STATUS_INPUT
+
+
+def _info_input_for_date(input_date: str | None) -> str:
+    """Return a date-scoped info glob when input_date is given."""
+    if input_date:
+        return (
+            f"gs://{_BUCKET}/ecobici/station_information/"
+            f"ingestion_date={input_date}/station_information.json"
+        )
+    return DEFAULT_INFO_INPUT
+
+
 def _transform_state_changes(spark: SparkSession, input_path: str) -> DataFrame:
     """Explode station_status snapshots and filter to state-change rows only.
 
@@ -223,15 +243,19 @@ def run_job(
 @click.command()
 @click.option(
     "--input-path",
-    default=DEFAULT_STATUS_INPUT,
-    show_default=True,
-    help="GCS glob for station_status JSON snapshots",
+    default=None,
+    help="GCS glob for station_status JSON snapshots (overrides --input-date)",
+)
+@click.option(
+    "--input-date",
+    default=None,
+    help="Process only this date's snapshots (YYYY-MM-DD). "
+    "Ignored when --input-path is set explicitly.",
 )
 @click.option(
     "--info-input",
-    default=DEFAULT_INFO_INPUT,
-    show_default=True,
-    help="GCS glob for station_information JSON snapshots",
+    default=None,
+    help="GCS glob for station_information JSON snapshots (overrides --input-date for info)",
 )
 @click.option(
     "--output-path",
@@ -251,16 +275,19 @@ def run_job(
     help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
 )
 def run(
-    input_path: str,
-    info_input: str,
+    input_path: str | None,
+    input_date: str | None,
+    info_input: str | None,
     output_path: str,
     local: bool,
     gcp_project_id: str,
 ) -> None:
     """Transform EcoBici station_status snapshots to Silver state-change Parquet."""
+    resolved_input = input_path or _status_input_for_date(input_date)
+    resolved_info = info_input or _info_input_for_date(input_date)
     spark = get_spark_session("cdmx-ecobici-silver", local=local)
     try:
-        run_job(spark, input_path, info_input, output_path, gcp_project_id)
+        run_job(spark, resolved_input, resolved_info, output_path, gcp_project_id)
     finally:
         spark.stop()
 

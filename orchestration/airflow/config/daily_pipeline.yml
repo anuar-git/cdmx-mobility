@@ -1,0 +1,51 @@
+dag_id: daily_mobility_pipeline
+# 08:00 UTC = 02:00 CDMX (UTC-6). All ingestors finish before midnight CDMX,
+# so yesterday's Bronze is complete before this DAG fires.
+schedule: "0 8 * * *"
+start_date: "2026-04-18"
+catchup: true
+max_active_runs: 1
+
+default_args:
+  retries: 2
+  retry_delay_minutes: 5
+  retry_exponential_backoff: true
+  email_on_failure: true
+  email: anuar.hage@gmail.com
+
+# Alert if the DAG hasn't finished 2 h after scheduled time.
+sla_miss_seconds: 7200
+
+gcp_project: cdmx-mobility-prod
+gcs_data_bucket: cdmx-mobility-data
+gcs_raw_bucket: cdmx-mobility-raw
+region: us-central1
+
+dataproc_templates:
+  weather:  cdmx-spark-weather
+  metro:    cdmx-spark-metro
+  ecobici:  cdmx-spark-ecobici
+  metrobus: cdmx-spark-metrobus
+
+cloud_run_jobs:
+  ecobici_ingest:   ecobici-ingest
+  metrobus_static:  metrobus-gtfs-static
+  metrobus_email:   metrobus-gtfs-email-ingest
+  weather_ingest:   weather-ingest
+
+# GCS prefixes probed by landing sensors before Spark is launched.
+# {{ ds }} is Airflow's logical date (YYYY-MM-DD).
+landing_sensors:
+  metro_prefix:    "metro/affluence/ingestion_date={{ ds }}/"
+  weather_prefix:  "weather/hourly/ingestion_date={{ ds }}/"
+  metrobus_prefix: "metrobus/vehicle_positions/ingestion_date={{ ds }}/"
+  ecobici_prefix:  "ecobici/station_status/ingestion_ts={{ ds }}T"
+
+# dbt node selectors for the daily batch (space-separated).
+dbt_daily_selector: >-
+  fct_metro_affluence_daily
+  fct_ecobici_station_hourly
+  fct_metrobus_stop_events_daily
+  dim_date
+  dim_station
+  dim_weather_condition

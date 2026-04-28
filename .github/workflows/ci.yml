@@ -135,6 +135,62 @@ jobs:
           CDMX_RAW_BUCKET_NAME: cdmx-mobility-data
         run: uv run python main.py ingest-metro-affluence
 
+  validate-dags:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Airflow + providers (no extras that need GCP auth)
+        run: |
+          pip install --quiet \
+            "apache-airflow==2.9.3" \
+            "apache-airflow-providers-google==10.22.0" \
+            "apache-airflow-providers-slack==8.8.0" \
+            "apache-airflow-providers-http==4.13.0" \
+            "great-expectations==1.3.10" \
+            "dbt-bigquery==1.9.0" \
+            "pyyaml"
+
+      - name: Parse DAGs (import + DagBag validation)
+        env:
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+          AIRFLOW__CORE__DAGS_FOLDER: orchestration/airflow/dags
+          # Disable DB check — we only want import-time validation.
+          AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////tmp/airflow_ci.db
+        run: |
+          airflow db init 2>/dev/null
+          python - <<'EOF'
+          import sys
+          from airflow.models import DagBag
+
+          bag = DagBag(dag_folder="orchestration/airflow/dags", include_examples=False)
+          errors = bag.import_errors
+          if errors:
+              for dag_file, err in errors.items():
+                  print(f"ERROR in {dag_file}:\n{err}", file=sys.stderr)
+              sys.exit(1)
+
+          expected = {
+              "daily_mobility_pipeline",
+              "hourly_realtime_pipeline",
+              "weekly_backfill_check",
+          }
+          found = set(bag.dags.keys())
+          missing = expected - found
+          if missing:
+              print(f"ERROR: DAGs not found in DagBag: {missing}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"OK: {len(found)} DAGs loaded — {sorted(found)}")
+          EOF
+
   build-and-push:
     runs-on: ubuntu-latest
     needs: lint-and-test

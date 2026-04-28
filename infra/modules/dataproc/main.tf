@@ -96,7 +96,26 @@ resource "google_dataproc_workflow_template" "spark_job" {
         "gs://${var.bucket_name}/code/spark_jobs/spark_jobs.zip",
         "gs://${var.bucket_name}/code/spark_jobs/ingestion.zip",
       ]
-      args = ["--gcp-project-id", var.project_id]
+      # {{INPUT_DATE}} is substituted at instantiation time via the parameters block below.
+      # When empty the Spark job defaults to processing all available partitions.
+      args = ["--gcp-project-id", var.project_id, "--input-date", "{{INPUT_DATE}}"]
+    }
+  }
+
+  # INPUT_DATE lets Airflow (or a manual gcloud call) scope each run to a single
+  # Bronze partition. Example:
+  #   gcloud dataproc workflow-templates instantiate cdmx-spark-ecobici \
+  #     --region=us-central1 --parameters=INPUT_DATE=2026-04-27
+  # Leave empty to process all available dates (useful for first-time full loads).
+  parameters {
+    name        = "INPUT_DATE"
+    description = "Bronze partition to process (YYYY-MM-DD). Empty = all partitions."
+    fields      = ["jobs['spark-job'].pysparkJob.args[3]"]
+
+    validation {
+      regex {
+        regexes = ["^\\d{4}-\\d{2}-\\d{2}$", "^$"]
+      }
     }
   }
 }

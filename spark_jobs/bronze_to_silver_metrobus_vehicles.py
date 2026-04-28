@@ -86,6 +86,14 @@ DEFAULT_POSITIONS_INPUT = f"gs://{_BUCKET}/metrobus/vehicle_positions/ingestion_
 DEFAULT_STOPS_INPUT = f"gs://{_BUCKET}/metrobus/static/stops/ingestion_date=*/stops.csv"
 DEFAULT_OUTPUT_PATH = f"gs://{_BUCKET}/silver/metrobus/stop_events/"
 
+
+def _positions_input_for_date(input_date: str | None) -> str:
+    """Return a date-scoped positions glob when input_date is given."""
+    if input_date:
+        return f"gs://{_BUCKET}/metrobus/vehicle_positions/ingestion_date={input_date}/"
+    return DEFAULT_POSITIONS_INPUT
+
+
 # A gap larger than this (seconds) between consecutive at-stop records breaks
 # the session and starts a new dwell event for that vehicle+stop pair.
 # sinopticoplus delivers snapshots every ~5 minutes (300s); set the threshold
@@ -292,9 +300,14 @@ def run_job(
 @click.command()
 @click.option(
     "--input-path",
-    default=DEFAULT_POSITIONS_INPUT,
-    show_default=True,
-    help="GCS glob for vehicle position NDJSON files",
+    default=None,
+    help="GCS glob for vehicle position NDJSON files (overrides --input-date)",
+)
+@click.option(
+    "--input-date",
+    default=None,
+    help="Process only this ingestion_date partition (YYYY-MM-DD). "
+    "Ignored when --input-path is set explicitly.",
 )
 @click.option(
     "--stops-input",
@@ -320,16 +333,18 @@ def run_job(
     help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
 )
 def run(
-    input_path: str,
+    input_path: str | None,
+    input_date: str | None,
     stops_input: str,
     output_path: str,
     local: bool,
     gcp_project_id: str,
 ) -> None:
     """Transform Metrobús vehicle positions to Silver stop-dwell events."""
+    resolved_input = input_path or _positions_input_for_date(input_date)
     spark = get_spark_session("cdmx-metrobus-stop-events-silver", local=local)
     try:
-        run_job(spark, input_path, stops_input, output_path, gcp_project_id)
+        run_job(spark, resolved_input, stops_input, output_path, gcp_project_id)
     finally:
         spark.stop()
 

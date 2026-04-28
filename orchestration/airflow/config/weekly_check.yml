@@ -1,0 +1,44 @@
+dag_id: weekly_backfill_check
+# Mondays 10:00 UTC = 04:00 CDMX. Checks the previous 7 days of Gold data.
+schedule: "0 10 * * 1"
+start_date: "2026-04-21"
+catchup: false
+
+default_args:
+  retries: 1
+  retry_delay_minutes: 10
+
+gcp_project: cdmx-mobility-prod
+lookback_days: 7
+
+checks:
+  - model: fct_metro_affluence_daily
+    dataset: marts_cdmx
+    expectations:
+      - type: expect_column_values_to_not_be_null
+        kwargs:
+          column: total_entries
+      - type: expect_column_values_to_be_between
+        kwargs:
+          column: total_entries
+          min_value: 0
+          max_value: 5000000
+
+  - model: fct_ecobici_station_hourly
+    dataset: marts_cdmx
+    expectations:
+      - type: expect_column_values_to_not_be_null
+        kwargs:
+          column: available_bikes
+      - type: expect_table_row_count_to_be_between
+        kwargs:
+          min_value: 1
+          max_value: 10000000
+
+  - model: fct_metrobus_stop_events_daily
+    dataset: marts_cdmx
+    expectations:
+      - type: expect_table_row_count_to_be_between
+        kwargs:
+          min_value: 1
+          max_value: 500000

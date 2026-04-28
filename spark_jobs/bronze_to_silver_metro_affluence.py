@@ -58,6 +58,16 @@ DEFAULT_INPUT_PATH = (
 DEFAULT_OUTPUT_PATH = f"gs://{_DATA_BUCKET}/silver/metro/affluence_daily/"
 
 
+def _input_path_for_date(input_date: str | None) -> str:
+    """Return a date-scoped GCS glob when input_date is given, else the wildcard default."""
+    if input_date:
+        return (
+            f"gs://{_RAW_BUCKET}/metro/affluence_simple/"
+            f"ingestion_date={input_date}/afluenciastc_simple_*.csv"
+        )
+    return DEFAULT_INPUT_PATH
+
+
 def _fix_encoding(s: str | None) -> str | None:
     """Reverse double-encoded UTF-8 mojibake present in both afluenciastc CSV vintages.
 
@@ -179,9 +189,15 @@ def run_job(
 @click.command()
 @click.option(
     "--input-path",
-    default=DEFAULT_INPUT_PATH,
+    default=None,
     show_default=True,
-    help="GCS glob or local path for input CSVs",
+    help="GCS glob or local path for input CSVs (overrides --input-date)",
+)
+@click.option(
+    "--input-date",
+    default=None,
+    help="Process only this ingestion_date partition (YYYY-MM-DD). "
+    "Ignored when --input-path is set explicitly.",
 )
 @click.option(
     "--output-path",
@@ -200,11 +216,18 @@ def run_job(
     required=True,
     help="GCP project ID (or set CDMX_GCP_PROJECT_ID)",
 )
-def run(input_path: str, output_path: str, local: bool, gcp_project_id: str) -> None:
+def run(
+    input_path: str | None,
+    input_date: str | None,
+    output_path: str,
+    local: bool,
+    gcp_project_id: str,
+) -> None:
     """Transform metro affluence Bronze CSVs to Silver Parquet (daily totals)."""
+    resolved_input = input_path or _input_path_for_date(input_date)
     spark = get_spark_session("cdmx-metro-affluence-silver", local=local)
     try:
-        run_job(spark, input_path, output_path, gcp_project_id)
+        run_job(spark, resolved_input, output_path, gcp_project_id)
     finally:
         spark.stop()
 
