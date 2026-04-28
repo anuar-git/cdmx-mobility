@@ -29,7 +29,7 @@ jobs:
         run: uv python install 3.11.9
 
       - name: Install dependencies
-        run: uv sync --group spark
+        run: uv sync --group spark --no-group gx
 
       - name: Run ruff
         run: uv run ruff check .
@@ -120,7 +120,8 @@ jobs:
         run: uv python install 3.11.9
 
       - name: Install dependencies
-        run: uv sync --no-dev --frozen
+        # Exclude gx (GE→pandas→numpy) and spark — only base ingestion deps needed.
+        run: uv sync --no-dev --no-group gx --no-group spark --frozen
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -258,10 +259,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: TypeScript type check
-        run: npm run typecheck
-
-      - name: Build (validates all pages compile)
+      # next build generates next-env.d.ts (required for JSX types), runs the
+      # TypeScript compiler, and validates all pages. Replaces a separate
+      # tsc --noEmit step which would fail because next-env.d.ts doesn't exist
+      # before the first build. force-dynamic on the pipeline page prevents
+      # Next.js from fetching the live API during static generation.
+      - name: Build (generates types, type-checks, validates all pages)
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8080

@@ -1,3 +1,7 @@
+// Always render server-side so the API is only called at request time,
+// not at build time (which has no live pipeline-api endpoint).
+export const dynamic = "force-dynamic";
+
 import { api } from "@/lib/api";
 import { FreshnessCard } from "@/components/FreshnessCard";
 import { RowCountChart } from "@/components/RowCountChart";
@@ -122,7 +126,7 @@ export default async function PipelinePage() {
           subtitle="Lag between the most recent Silver record and the check time. Violations fire a Slack alert."
         />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {freshnessRows.map((row) => (
+          {freshnessRows.map((row: import("@/lib/types").FreshnessRow) => (
             <FreshnessCard key={row.source} row={row} />
           ))}
         </div>
