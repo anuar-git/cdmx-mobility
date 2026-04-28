@@ -29,7 +29,7 @@ jobs:
         run: uv python install 3.11.9
 
       - name: Install dependencies
-        run: uv sync --group spark --no-group gx
+        run: uv sync --group spark
 
       - name: Run ruff
         run: uv run ruff check .
@@ -120,8 +120,8 @@ jobs:
         run: uv python install 3.11.9
 
       - name: Install dependencies
-        # Exclude gx (GE→pandas→numpy) and spark — only base ingestion deps needed.
-        run: uv sync --no-dev --no-group gx --no-group spark --frozen
+        # Exclude spark — only base ingestion deps needed here.
+        run: uv sync --no-dev --no-group spark --frozen
 
       - id: auth
         uses: google-github-actions/auth@v2

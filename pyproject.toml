@@ -37,9 +37,6 @@ spark = [
     "delta-spark>=3.2.0",
     "h3==3.7.7",
 ]
-gx = [
-    "great-expectations==1.3.10",
-]
 
 [tool.ruff]
 line-length = 100
