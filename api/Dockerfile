@@ -5,7 +5,7 @@ WORKDIR /app
 # Install only the runtime deps needed by the API — not spark or dev groups.
 COPY pyproject.toml uv.lock* ./
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-dev \
+    uv pip install --system \
         "fastapi>=0.115.0" \
         "uvicorn[standard]>=0.30.0" \
         "google-cloud-bigquery>=3.25.0"
