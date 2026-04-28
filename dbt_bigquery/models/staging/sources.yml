@@ -1,6 +1,83 @@
 version: 2
 
 sources:
+  - name: meta_cdmx
+    database: cdmx-mobility-prod
+    schema: meta_cdmx
+    description: Pipeline metadata — ingestion logs, dbt run results, GE results, freshness SLAs.
+    tables:
+      - name: ingestion_log
+        description: One row per ingestor run. Written by IngestionLogger.log() in every ingestor.
+        columns:
+          - name: source
+            description: Ingestor identifier (e.g. ecobici_station_status, metro_affluence).
+          - name: run_id
+            description: UUID4 generated at the start of each ingestor run.
+          - name: file_count
+          - name: byte_count
+          - name: row_count
+          - name: status
+            description: success / error / skipped.
+          - name: error_message
+          - name: ingested_at
+            description: UTC TIMESTAMP when the run completed. Partition column.
+
+      - name: dbt_run_results
+        description: >
+          One row per dbt node (model/seed/snapshot) per DAG run.
+          Written by upload_dbt_artifacts after dbt build completes.
+        columns:
+          - name: run_date
+          - name: unique_id
+          - name: node_name
+          - name: node_schema
+          - name: status
+            description: success / error / warn / skip.
+          - name: execution_ms
+          - name: rows_affected
+          - name: recorded_at
+
+      - name: dbt_test_results
+        description: One row per dbt test per DAG run. Written by upload_dbt_artifacts.
+        columns:
+          - name: run_date
+          - name: unique_id
+          - name: node_name
+          - name: status
+            description: pass / fail / warn / error.
+          - name: failures
+            description: Number of failing rows (0 = passed).
+          - name: recorded_at
+
+      - name: gx_validation_results
+        description: >
+          One row per Great Expectations suite per DAG run.
+          Written by run_gx_validation after Spark Silver completes.
+        columns:
+          - name: run_date
+          - name: suite_name
+            description: e.g. silver_ecobici_state_changes.
+          - name: table_name
+          - name: success
+          - name: evaluated_count
+          - name: successful_count
+          - name: unsuccessful_count
+          - name: recorded_at
+
+      - name: freshness_sla_log
+        description: >
+          One row per source per DAG run. Written by check_freshness_slas
+          after dbt test completes. is_violated=TRUE triggers the Slack alert.
+        columns:
+          - name: source
+            description: Canonical source name — ecobici / metro / metrobus / weather.
+          - name: latest_ts
+            description: MAX timestamp found in the Silver table at check time.
+          - name: sla_minutes
+          - name: lag_minutes
+          - name: is_violated
+          - name: checked_at
+
   - name: silver_cdmx
     database: cdmx-mobility-prod
     schema: silver_cdmx

@@ -68,8 +68,27 @@ CDMX_GCP_PROJECT_ID=cdmx-mobility-prod uv run python -m spark_jobs.bronze_to_sil
   --stops-input "/tmp/bronze/metrobus/stops/ingestion_date=*/stops.csv" \
   --output-path /tmp/silver/metrobus
 
+# All four jobs also accept --input-date YYYY-MM-DD to scope the Bronze GCS glob
+# to a single partition — used by Airflow for date-specific runs and backfills.
+
 # Note: use `python -m spark_jobs.<job>` not `python spark_jobs/<job>.py`.
 # The latter adds spark_jobs/ to sys.path and breaks the `ingestion` import.
+
+# Airflow VM (access via IAP tunnel)
+make airflow-up        # docker compose up on the VM
+make airflow-down      # docker compose down
+make airflow-logs      # tail scheduler + webserver logs
+make airflow-status    # show running containers
+
+# Open a local tunnel then browse to http://localhost:8080
+gcloud compute ssh cdmx-airflow --tunnel-through-iap --project=cdmx-mobility-prod \
+  --zone=us-central1-a -- -L 8080:localhost:8080
+
+# Backfill a single missed day (opens IAP tunnel, POSTs to Airflow REST API)
+make backfill DATE=2026-03-15
+
+# Backfill a date range
+make backfill-range START=2026-03-01 END=2026-03-15
 
 # dbt (run from dbt_bigquery/)
 cd dbt_bigquery/
@@ -115,7 +134,7 @@ gs://cdmx-mobility-raw/     gs://cdmx-mobility-data/
                               ecobici/system_alerts/ingestion_ts=YYYY-MM-DDTHH-MM/
                               weather/hourly/ingestion_date=YYYY-MM-DD/
   │
-  ▼  (Spark on ephemeral Dataproc — triggered by Cloud Scheduler)
+  ▼  (Spark on ephemeral Dataproc — triggered by Airflow daily_mobility_pipeline DAG)
 spark_jobs/
   bronze_to_silver_ecobici.py          → silver/ecobici/state_changes/ + station_master/
   bronze_to_silver_metro_affluence.py  → silver/metro/affluence_daily/
@@ -170,7 +189,7 @@ Tableau (reads from marts_cdmx — primary table: fct_unified_mobility_hourly)
 - [spark_jobs/](spark_jobs/) — Four PySpark Bronze→Silver jobs running on ephemeral Dataproc clusters. Each job accepts `--input-path`, `--output-path`, and `--local` (local[2] for smoke tests). Imports from `ingestion/` for BQ logging; must be invoked as `python -m spark_jobs.<job>` to resolve imports correctly.
   - `conformance/` — Shared utilities: `spark_session.py`, `time_utils.py` (UTC→CDMX service_date), `station_names.py` (metro station name canonicalization), `h3_utils.py` (spatial stop snapping).
 - [dbt_bigquery/](dbt_bigquery/) — SQL transformations. Silver→Gold layer is fully implemented and live. Sources: `raw_cdmx` (Bronze) and `silver_cdmx` (Silver Parquet). `generate_schema_name` macro in `macros/` ensures prod writes to clean dataset names (`staging_cdmx`, `marts_cdmx`, etc.) without target prefix. Profile in `~/.dbt/profiles.yml`; dev target writes to `*_dev` datasets.
-- [orchestration/](orchestration/) — Pipeline scheduling (placeholder).
+- [orchestration/](orchestration/) — Self-hosted Airflow 2.9.3 on a GCE e2-standard-2 VM (`cdmx-airflow`). Three DAGs: `daily_mobility_pipeline` (08:00 UTC, ingest → sensors → Spark Silver → dbt build/test → Slack notify), `hourly_realtime_pipeline` (:05 past each hour, EcoBici only), `weekly_backfill_check` (Sunday 09:00, Great Expectations quality report). Config externalized to `orchestration/airflow/config/*.yml`. Docker Compose stack (postgres + scheduler + webserver) managed by `orchestration/docker-compose.yml`. VM bootstrapped via `infra/modules/airflow_vm/startup.sh`; DAGs synced from GitHub every 5 min via cron. Access via IAP TCP tunnel only — port 8080 never exposed publicly.
 - [infra/](infra/) — Terraform modules for all GCP resources (see Infrastructure section).
 - [docs/](docs/) — `cost-estimates.md` (~$58/month steady state), `adr/002-spark-for-bronze-to-silver.md`.
 
@@ -281,9 +300,10 @@ terraform apply -var-file="terraform.tvars"
   - Job `metrobus-gtfs-email-ingest` — triggered by Cloud Scheduler every 5 min (polls for new sinopticoplus emails)
   - Job `weather-ingest` — triggered by Cloud Scheduler daily 02:00
   - Service `metrobus-gtfs-inbound` — public ingress, receives GTFS NDJSON from SendGrid webhook
-- `module.scheduler` — 7 Cloud Scheduler jobs (ecobici poll, metrobus static, metrobus email, weather, + 4 Spark Silver jobs). Spark Silver jobs are staggered to prevent concurrent cluster creation (quota limit: 10 vCPUs across all regions): weather 04:00, metro 06:00, ecobici 06:30, metrobus 07:00.
+- `module.scheduler` — 3 Cloud Scheduler jobs: ecobici poll (every 10 min), metrobus email ingest (every 5 min), weather ingest (daily 02:00). Metrobús static Cloud Run Job also scheduled (daily 04:00). The 4 Spark Silver Dataproc jobs are **no longer triggered by Cloud Scheduler** — they are triggered by the Airflow `daily_mobility_pipeline` DAG.
 - `module.secrets` — Secret Manager secrets
-- `module.dataproc` — 4 Dataproc workflow templates (`cdmx-spark-ecobici`, `cdmx-spark-metro`, `cdmx-spark-metrobus`, `cdmx-spark-weather`), each with an ephemeral 1 master + 3 workers **n1-standard-2** cluster (8 vCPUs total — fits within the 10-vCPU `CPUS_ALL_REGIONS` project quota). Spark job `.py` files and `spark_jobs.zip` / `ingestion.zip` are uploaded to GCS by CI on every push to `main`.
+- `module.dataproc` — 4 Dataproc workflow templates (`cdmx-spark-ecobici`, `cdmx-spark-metro`, `cdmx-spark-metrobus`, `cdmx-spark-weather`), each with an ephemeral 1 master + 3 workers **n1-standard-2** cluster (8 vCPUs total — fits within the 10-vCPU `CPUS_ALL_REGIONS` project quota). Each template accepts an `INPUT_DATE` parameter (regex-validated `YYYY-MM-DD` or empty) passed by Airflow at instantiation. Spark job `.py` files and `spark_jobs.zip` / `ingestion.zip` are uploaded to GCS by CI on every push to `main`.
+- `module.airflow_vm` — GCE e2-standard-2 VM (`cdmx-airflow`, Debian 12, 50 GB pd-balanced), static IP, IAP firewall (port 22 + 8080 from `35.235.240.0/20` only). Service account `cdmx-airflow-sa` with 8 roles: `run.invoker`, `dataproc.editor`, `dataproc.worker`, `bigquery.dataEditor`, `bigquery.jobUser`, `storage.objectAdmin`, `secretmanager.secretAccessor`, `iam.serviceAccountUser`. Secrets: `airflow-fernet-key`, `airflow-db-password`, `airflow-slack-webhook-url` (all auto-replicated).
 
 ## Container Image
 
@@ -327,7 +347,8 @@ Jobs:
 - `terraform-validate` — fmt check + validate. **Skipped on schedule trigger.**
 - `gcp-auth-smoke-test` — WIF auth verification. Push to main only.
 - `ingest-metro` — runs metro affluence ingestor on every push to main and on the daily schedule. Exits 0 on `ConnectTimeout`/`ConnectError` (logs `status=skipped` to BQ) because `datos.cdmx.gob.mx` intermittently blocks GitHub Actions IPs.
-- `build-and-push` — builds and pushes Docker image; also uploads `spark_jobs/*.py` and `conformance.zip` to `gs://cdmx-mobility-data/code/spark_jobs/`. Push to main only, after `lint-and-test`. **Does NOT automatically redeploy Cloud Run services/jobs** — Cloud Run resolves `:latest` at deploy time, not at image push time. After CI, manually run `gcloud run services update metrobus-gtfs-inbound --image=...` and `gcloud run jobs update <job> --image=...` to roll out the new image, or make a Terraform change that touches the resource (which forces redeployment as a side effect).
+- `build-and-push` — builds and pushes Docker image; also uploads `spark_jobs/*.py` and `spark_jobs.zip` / `ingestion.zip` to `gs://cdmx-mobility-data/code/spark_jobs/`. Push to main only, after `lint-and-test`. **Does NOT automatically redeploy Cloud Run services/jobs** — Cloud Run resolves `:latest` at deploy time, not at image push time. After CI, manually run `gcloud run services update metrobus-gtfs-inbound --image=...` and `gcloud run jobs update <job> --image=...` to roll out the new image, or make a Terraform change that touches the resource.
+- `validate-dags` — installs Airflow 2.9.3 + providers, runs `airflow db init`, loads DagBag from `orchestration/airflow/dags/`, and asserts all three expected DAG IDs are present with no import errors. Runs on push and pull_request (skipped on schedule trigger).
 - `dbt parse` step in CI requires `dbt deps` to run first — packages must be installed before parsing.
 
 Required GitHub secrets: `WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`.

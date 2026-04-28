@@ -49,3 +49,4 @@ dbt_daily_selector: >-
   dim_date
   dim_station
   dim_weather_condition
+  dim_pipeline_health

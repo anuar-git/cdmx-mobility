@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   id-token: write   # required for Workload Identity Federation
+  pages: write      # required for GitHub Pages deployment (dbt-docs job)
 
 jobs:
   lint-and-test:
@@ -166,6 +167,10 @@ jobs:
           AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////tmp/airflow_ci.db
         run: |
           airflow db init 2>/dev/null
+          # The DAG inserts orchestration/airflow/scripts/ into sys.path at import
+          # time. Pre-add it so the DagBag loader resolves the path correctly from
+          # the repo root even without a running Airflow VM.
+          export PYTHONPATH="${PYTHONPATH}:orchestration/airflow/scripts"
           python - <<'EOF'
           import sys
           from airflow.models import DagBag
@@ -224,3 +229,90 @@ jobs:
           docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
+
+      - name: Build and push pipeline-api image
+        env:
+          IMAGE: us-central1-docker.pkg.dev/cdmx-mobility-prod/ingestor/pipeline-api
+        run: |
+          docker build -f api/Dockerfile \
+            -t "$IMAGE:${{ github.sha }}" \
+            -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+  dashboard-typecheck:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: dashboard/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - name: Build (validates all pages compile)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+
+  dbt-docs:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11.9
+
+      - name: Install dbt dependencies
+        run: uv sync --group spark
+
+      - name: Create dbt profile (offline — generates docs without BQ connection)
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          cdmx_mobility:
+            target: prod
+            outputs:
+              prod:
+                type: bigquery
+                method: oauth
+                project: cdmx-mobility-prod
+                dataset: marts_cdmx
+                threads: 1
+                timeout_seconds: 300
+                location: US
+          EOF
+
+      - name: dbt deps + docs generate
+        working-directory: dbt_bigquery
+        run: |
+          uv run dbt deps
+          uv run dbt docs generate --no-compile
+
+      - name: Upload dbt docs as GitHub Pages artifact
+        id: pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dbt_bigquery/target/

@@ -14,6 +14,18 @@ variable "metrobus_sinoptico_recipient_email" {
   type = string
 }
 
+variable "pipeline_api_image" {
+  type        = string
+  description = "Full image URI for the pipeline health API container."
+  default     = ""
+}
+
+variable "dashboard_origin" {
+  type        = string
+  description = "Allowed CORS origin for the pipeline API (e.g. https://pipeline.yourdomain.com)."
+  default     = "http://localhost:3000"
+}
+
 resource "google_artifact_registry_repository" "ingestor" {
   project       = var.project_id
   location      = var.region
@@ -254,6 +266,65 @@ resource "google_cloud_run_v2_service_iam_member" "inbound_public" {
   member   = "allUsers"
 }
 
+
+# ── Pipeline Health API ───────────────────────────────────────────────────────
+# Separate Cloud Run service that exposes /api/pipeline/* endpoints backed
+# by meta_cdmx and marts_cdmx BigQuery tables. Authentication is via IAM
+# invoker — the dashboard passes an OIDC identity token.
+resource "google_cloud_run_v2_service" "pipeline_api" {
+  count               = var.pipeline_api_image != "" ? 1 : 0
+  name                = "pipeline-api"
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
+
+  template {
+    service_account = var.service_account_email
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+
+    containers {
+      image = var.pipeline_api_image
+
+      env {
+        name  = "CDMX_GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name  = "CORS_ORIGINS"
+        value = var.dashboard_origin
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+    }
+  }
+}
+
+# Require authentication — only callers with roles/run.invoker can call this.
+# The dashboard's service account (or the user's identity via IAP) must have this role.
+resource "google_cloud_run_v2_service_iam_member" "pipeline_api_invoker" {
+  count    = var.pipeline_api_image != "" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.pipeline_api[0].name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.service_account_email}"
+}
+
+output "pipeline_api_url" {
+  value = length(google_cloud_run_v2_service.pipeline_api) > 0 ? google_cloud_run_v2_service.pipeline_api[0].uri : ""
+}
 
 output "job_name" {
   value = google_cloud_run_v2_job.ecobici_ingest.name

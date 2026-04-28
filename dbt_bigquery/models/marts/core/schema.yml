@@ -228,3 +228,76 @@ models:
         description: Plain-language summary of conditions and ridership impact.
         tests:
           - not_null
+
+  - name: dim_pipeline_health
+    description: >
+      Observability table for the daily_mobility_pipeline DAG. One row per
+      (run_date, canonical_source). Joins four meta_cdmx tables — ingestion_log,
+      dbt_run_results, dbt_test_results, gx_validation_results, and freshness_sla_log —
+      into a single denormalized view. Primary source for the pipeline health dashboard.
+      dbt metrics (runtime, test pass rate) are pipeline-wide and repeat across source rows.
+    columns:
+      - name: run_date
+        description: Logical DAG execution date (DATE). Partition column.
+        tests:
+          - not_null
+      - name: canonical_source
+        description: Normalised source — ecobici / metro / metrobus / weather.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ecobici', 'metro', 'metrobus', 'weather']
+      - name: last_ingested_at
+        description: Latest ingested_at TIMESTAMP among all runs for this source on run_date.
+      - name: total_files
+        description: Sum of file_count across all ingestor runs for this source.
+      - name: total_bytes
+        description: Sum of byte_count across all ingestor runs for this source.
+      - name: total_rows_ingested
+        description: Sum of row_count across all ingestor runs for this source.
+      - name: ingest_success_runs
+        description: Count of status='success' rows in ingestion_log for this source/day.
+      - name: ingest_error_runs
+        description: Count of status='error' rows.
+      - name: ingest_skipped_runs
+        description: Count of status='skipped' rows (CKAN timeout, etc.).
+      - name: dbt_total_runtime_seconds
+        description: Sum of execution_ms across all dbt models for this DAG run, in seconds.
+      - name: dbt_models_succeeded
+        description: Count of dbt models with status='success'.
+      - name: dbt_models_failed
+        description: Count of dbt models with status other than 'success'.
+      - name: dbt_total_rows_affected
+        description: Sum of rows_affected from dbt model adapter responses.
+      - name: dbt_tests_passed
+        description: Count of dbt tests with status='pass'.
+      - name: dbt_tests_failed
+        description: Count of dbt tests with status='fail'.
+      - name: dbt_tests_total
+        description: Total dbt tests executed.
+      - name: dbt_test_pass_rate_pct
+        description: Percentage of dbt tests that passed (0–100).
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: gx_all_suites_passed
+        description: True if every GE suite for this source passed on this run_date.
+      - name: gx_evaluated_count
+        description: Total GE expectations evaluated across all suites for this source.
+      - name: gx_successful_count
+        description: Count of GE expectations that passed.
+      - name: gx_unsuccessful_count
+        description: Count of GE expectations that failed.
+      - name: gx_pass_rate_pct
+        description: Percentage of GE expectations that passed (0–100).
+      - name: freshness_lag_minutes
+        description: Lag in minutes between the most recent Silver record and the check time.
+      - name: freshness_sla_minutes
+        description: Per-source SLA threshold in minutes.
+      - name: freshness_sla_violated
+        description: True if freshness_lag_minutes > freshness_sla_minutes.
+      - name: silver_latest_ts
+        description: MAX timestamp from the Silver table at the time of the freshness check.

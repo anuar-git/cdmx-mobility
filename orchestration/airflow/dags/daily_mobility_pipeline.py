@@ -9,8 +9,11 @@ Stages:
   3. spark   — DataprocInstantiateWorkflowTemplateOperator, two parallel pairs
                to respect the 10-vCPU CPUS_ALL_REGIONS quota (8 vCPUs/cluster).
                Pair 1: weather + metro. Pair 2: ecobici + metrobus.
-  4. dbt     — dbt build (create/replace tables) then dbt test.
-  5. notify  — Slack success message.
+  4. gx      — Great Expectations validation on all four Silver tables.
+               Writes one summary row per suite to meta_cdmx.gx_validation_results.
+  5. dbt     — dbt build (create/replace tables) then dbt test.
+  6. observe — Upload dbt run artifacts to BQ, then check Silver freshness SLAs.
+  7. notify  — Slack success message.
 
 Backfill any missed day:
     make backfill DATE=2026-03-15
@@ -22,6 +25,7 @@ or:
 from __future__ import annotations
 
 import datetime
+import sys
 from pathlib import Path
 
 import yaml
@@ -51,6 +55,11 @@ _DEFAULT_ARGS: dict = {
     "email_on_failure": _CFG["default_args"]["email_on_failure"],
     "email": [_CFG["default_args"]["email"]],
 }
+
+# Add scripts directory to path so the Airflow worker can import the callables.
+_SCRIPTS_DIR = str(Path(__file__).parent.parent / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 
 def _on_failure(context: dict) -> None:
@@ -122,7 +131,6 @@ def daily_mobility_pipeline() -> None:
         GCSObjectExistenceSensor(
             task_id="wait_weather",
             bucket=_DATA_BUCKET,
-            # GCS prefix — sensor returns True when *any* object with this prefix exists.
             object=_CFG["landing_sensors"]["weather_prefix"],
             google_cloud_conn_id="google_cloud_default",
             poke_interval=300,
@@ -199,12 +207,19 @@ def daily_mobility_pipeline() -> None:
             sla=_SLA,
         )
 
-        # Sequential pairs — pair 1 frees its 8 vCPUs before pair 2 acquires them.
         cross_downstream([spark_weather, spark_metro], [spark_ecobici, spark_metrobus])
 
-    # ── 4. DBT BUILD + TEST ───────────────────────────────────────────────────
-    # dbt-bigquery is installed in the Airflow image. The VM's SA has BigQuery
-    # dataEditor + jobUser so no explicit credentials file is needed.
+    # ── 4. GREAT EXPECTATIONS — SILVER VALIDATION ────────────────────────────
+    # Runs after Silver is written, before dbt consumes it. Validates a
+    # same-day sample from each Silver table. Fails the DAG (and fires the
+    # on_failure_callback → Slack) if any expectation fails.
+    @task(task_id="gx_validate_silver", sla=_SLA)
+    def gx_validate_silver(run_date: str, **context: dict) -> None:
+        from run_gx_validation import run_gx_validations
+
+        run_gx_validations(project_id=_PROJECT, run_date=run_date)
+
+    # ── 5. DBT BUILD + TEST ───────────────────────────────────────────────────
     dbt_build = BashOperator(
         task_id="dbt_build",
         bash_command=(
@@ -232,7 +247,22 @@ def daily_mobility_pipeline() -> None:
         sla=_SLA,
     )
 
-    # ── 5. SUCCESS NOTIFICATION ───────────────────────────────────────────────
+    # ── 6. OBSERVABILITY ─────────────────────────────────────────────────────
+    # upload_dbt_artifacts must run after dbt_build so target/run_results.json exists.
+    # check_freshness runs after dbt_test (full pipeline complete) so lags are final.
+    @task(task_id="upload_dbt_artifacts", sla=_SLA)
+    def upload_dbt_artifacts_task(run_date: str, **_: dict) -> None:
+        from upload_dbt_artifacts import upload_dbt_artifacts
+
+        upload_dbt_artifacts(project_id=_PROJECT, run_date=run_date)
+
+    @task(task_id="check_freshness_slas", sla=_SLA)
+    def check_freshness_task(**_: dict) -> None:
+        from check_freshness import check_freshness_slas
+
+        check_freshness_slas(project_id=_PROJECT)
+
+    # ── 7. SUCCESS NOTIFICATION ───────────────────────────────────────────────
     @task
     def notify_success(**context: dict) -> None:
         ds = context["ds"]
@@ -241,7 +271,7 @@ def daily_mobility_pipeline() -> None:
             slack_webhook_conn_id="slack_cdmx",
             message=(
                 f":large_green_circle: *daily_mobility_pipeline* complete for `{ds}`.\n"
-                f"Silver + Gold refreshed. All dbt tests passed."
+                f"Silver + Gold refreshed. All dbt tests passed. Freshness SLAs OK."
             ),
         ).execute(context)
 
@@ -249,9 +279,12 @@ def daily_mobility_pipeline() -> None:
     ingest = ingest_group()
     sensors = sensors_group()
     spark = spark_group()
+    gx = gx_validate_silver(run_date="{{ ds }}")
+    artifacts = upload_dbt_artifacts_task(run_date="{{ ds }}")
+    freshness = check_freshness_task()
     success = notify_success()
 
-    ingest >> sensors >> spark >> dbt_build >> dbt_test >> success
+    ingest >> sensors >> spark >> gx >> dbt_build >> artifacts >> dbt_test >> freshness >> success
 
 
 daily_mobility_pipeline()

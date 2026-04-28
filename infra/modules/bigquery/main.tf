@@ -471,6 +471,94 @@ resource "google_bigquery_table" "silver_weather_hourly_fact" {
   ])
 }
 
+resource "google_bigquery_table" "dbt_run_results" {
+  dataset_id          = google_bigquery_dataset.datasets["meta_cdmx"].dataset_id
+  table_id            = "dbt_run_results"
+  project             = var.project_id
+  deletion_protection = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "recorded_at"
+  }
+
+  schema = jsonencode([
+    { name = "run_date", type = "DATE", mode = "REQUIRED" },
+    { name = "unique_id", type = "STRING", mode = "REQUIRED" },
+    { name = "node_name", type = "STRING", mode = "NULLABLE" },
+    { name = "node_schema", type = "STRING", mode = "NULLABLE" },
+    { name = "status", type = "STRING", mode = "REQUIRED" },
+    { name = "execution_ms", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "rows_affected", type = "INTEGER", mode = "NULLABLE" },
+    { name = "recorded_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+resource "google_bigquery_table" "dbt_test_results" {
+  dataset_id          = google_bigquery_dataset.datasets["meta_cdmx"].dataset_id
+  table_id            = "dbt_test_results"
+  project             = var.project_id
+  deletion_protection = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "recorded_at"
+  }
+
+  schema = jsonencode([
+    { name = "run_date", type = "DATE", mode = "REQUIRED" },
+    { name = "unique_id", type = "STRING", mode = "REQUIRED" },
+    { name = "node_name", type = "STRING", mode = "NULLABLE" },
+    { name = "status", type = "STRING", mode = "REQUIRED" },
+    { name = "failures", type = "INTEGER", mode = "NULLABLE" },
+    { name = "recorded_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+resource "google_bigquery_table" "gx_validation_results" {
+  dataset_id          = google_bigquery_dataset.datasets["meta_cdmx"].dataset_id
+  table_id            = "gx_validation_results"
+  project             = var.project_id
+  deletion_protection = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "recorded_at"
+  }
+
+  schema = jsonencode([
+    { name = "run_date", type = "DATE", mode = "REQUIRED" },
+    { name = "suite_name", type = "STRING", mode = "REQUIRED" },
+    { name = "table_name", type = "STRING", mode = "REQUIRED" },
+    { name = "success", type = "BOOLEAN", mode = "REQUIRED" },
+    { name = "evaluated_count", type = "INTEGER", mode = "NULLABLE" },
+    { name = "successful_count", type = "INTEGER", mode = "NULLABLE" },
+    { name = "unsuccessful_count", type = "INTEGER", mode = "NULLABLE" },
+    { name = "recorded_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+resource "google_bigquery_table" "freshness_sla_log" {
+  dataset_id          = google_bigquery_dataset.datasets["meta_cdmx"].dataset_id
+  table_id            = "freshness_sla_log"
+  project             = var.project_id
+  deletion_protection = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "checked_at"
+  }
+
+  schema = jsonencode([
+    { name = "source", type = "STRING", mode = "REQUIRED" },
+    { name = "latest_ts", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "sla_minutes", type = "INTEGER", mode = "REQUIRED" },
+    { name = "lag_minutes", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "is_violated", type = "BOOLEAN", mode = "REQUIRED" },
+    { name = "checked_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
 output "dataset_ids" {
   value = [for d in google_bigquery_dataset.datasets : d.dataset_id]
 }
