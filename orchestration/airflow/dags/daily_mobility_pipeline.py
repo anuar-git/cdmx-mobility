@@ -33,6 +33,7 @@ from airflow.providers.google.cloud.operators.dataproc import (
 )
 from airflow.providers.google.cloud.sensors.gcs import GCSObjectExistenceSensor
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
+from airflow.utils.helpers import cross_downstream
 
 _CFG_PATH = Path(__file__).parent.parent / "config" / "daily_pipeline.yml"
 _CFG = yaml.safe_load(_CFG_PATH.read_text())
@@ -199,7 +200,7 @@ def daily_mobility_pipeline() -> None:
         )
 
         # Sequential pairs — pair 1 frees its 8 vCPUs before pair 2 acquires them.
-        _ = [spark_weather, spark_metro] >> [spark_ecobici, spark_metrobus]
+        cross_downstream([spark_weather, spark_metro], [spark_ecobici, spark_metrobus])
 
     # ── 4. DBT BUILD + TEST ───────────────────────────────────────────────────
     # dbt-bigquery is installed in the Airflow image. The VM's SA has BigQuery
