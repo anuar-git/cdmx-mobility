@@ -291,7 +291,15 @@ jobs:
       - name: Install dbt dependencies
         run: uv sync --group spark
 
-      - name: Create dbt profile (offline — generates docs without BQ connection)
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Create dbt profile
         run: |
           mkdir -p ~/.dbt
           cat > ~/.dbt/profiles.yml << 'EOF'
