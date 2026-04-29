@@ -33,10 +33,12 @@ resource "google_cloud_scheduler_job" "ecobici_poll" {
 }
 
 resource "google_cloud_scheduler_job" "metrobus_gtfs_email" {
-  name      = "metrobus-gtfs-email-poll"
-  project   = var.project_id
-  region    = var.region
-  schedule  = "*/5 * * * *"
+  name    = "metrobus-gtfs-email-poll"
+  project = var.project_id
+  region  = var.region
+  # Metrobús runs 04:30–01:00 at the latest. Skip hours 1–3 (guaranteed off-hours)
+  # to avoid ~36 wasted invocations per night. Last fire at 00:55, next at 04:00.
+  schedule  = "*/5 0,4-23 * * *"
   time_zone = "America/Mexico_City"
 
   http_target {

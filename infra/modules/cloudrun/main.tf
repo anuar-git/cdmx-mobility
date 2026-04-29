@@ -196,6 +196,9 @@ resource "google_cloud_run_v2_service" "metrobus_gtfs_inbound" {
           cpu    = "1"
           memory = "512Mi"
         }
+        # CPU throttled between requests — bills only for active request handling,
+        # not idle time between the 5-minute sinopticoplus webhooks.
+        cpu_idle = true
       }
 
       startup_probe {

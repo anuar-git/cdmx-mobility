@@ -91,7 +91,7 @@ resource "google_compute_firewall" "airflow_iap" {
 
 resource "google_compute_instance" "airflow" {
   name         = "cdmx-airflow"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-medium"
   zone         = var.zone
   project      = var.project_id
 
@@ -122,8 +122,44 @@ resource "google_compute_instance" "airflow" {
     startup-script = file("${path.module}/startup.sh")
   }
 
+  resource_policies = [google_compute_resource_policy.airflow_schedule.id]
+
   # Prevent accidental replacement — changing machine_type requires allow_stopping.
   allow_stopping_for_update = true
+}
+
+# ── Instance Schedule ────────────────────────────────────────────────────────
+# Start 30 min before the 08:00 UTC Airflow DAG to allow Docker containers to
+# come up. Stop at 15:30 UTC — 1.5 hr buffer after typical pipeline completion
+# (~14:00 UTC). Continuous ingestors (EcoBici, Metrobús) run as Cloud Run Jobs
+# triggered by Cloud Scheduler and do not require the VM to be running.
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+resource "google_compute_resource_policy" "airflow_schedule" {
+  name    = "airflow-daily-schedule"
+  region  = var.region
+  project = var.project_id
+
+  instance_schedule_policy {
+    vm_start_schedule {
+      schedule = "30 7 * * *"
+    }
+    vm_stop_schedule {
+      schedule = "30 15 * * *"
+    }
+    time_zone = "UTC"
+  }
+}
+
+# The Compute Engine service agent must have instanceAdmin to execute start/stop
+# actions on behalf of the resource policy.
+resource "google_project_iam_member" "compute_system_instance_admin" {
+  project = var.project_id
+  role    = "roles/compute.instanceAdmin.v1"
+  member  = "serviceAccount:service-${data.google_project.project.number}@compute-system.iam.gserviceaccount.com"
 }
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
