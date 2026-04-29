@@ -95,7 +95,7 @@ def modal_corridor(
     """
     sql = """
         WITH metro_stops AS (
-            SELECT station_id, station_name, 'metro' AS mode, lat, lon, linea AS line_label
+            SELECT station_id, station_name, 'metro' AS mode, lat, lon, linea AS line_label, geog
             FROM `@project.marts_cdmx.dim_station`
             WHERE mode = 'metro' AND linea = @line AND geog IS NOT NULL
         ),
