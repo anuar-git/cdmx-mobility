@@ -4,7 +4,7 @@
         partition_by={
             'field': 'service_date',
             'data_type': 'date',
-            'granularity': 'day'
+            'granularity': 'month'
         },
         cluster_by=['metro_line']
     )

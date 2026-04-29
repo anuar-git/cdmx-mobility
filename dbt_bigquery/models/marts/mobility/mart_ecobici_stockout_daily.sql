@@ -23,7 +23,6 @@ select
     s.station_name,
     s.lat,
     s.lon,
-    s.geog,
     s.capacity,
     sum(e.stockout_minutes)         as stockout_minutes,
     sum(e.full_minutes)             as full_minutes,
@@ -36,4 +35,4 @@ from {{ ref('fct_ecobici_station_hourly') }} e
 inner join {{ ref('dim_station') }} s
     on e.station_key = s.station_key
 
-group by 1, 2, 3, 4, 5, 6, 7, 8
+group by 1, 2, 3, 4, 5, 6, 7

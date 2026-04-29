@@ -38,7 +38,6 @@ nearby_modes as (
         s1.mode,
         s1.lat,
         s1.lon,
-        s1.geog,
         count(distinct s2.mode)                                                     as nearby_mode_count,
         sum(
             case s2.mode
@@ -56,7 +55,7 @@ nearby_modes as (
         and abs(s1.lat - s2.lat) < 0.005
         and abs(s1.lon - s2.lon) < 0.005
         and st_distance(s1.geog, s2.geog) <= 500
-    group by 1, 2, 3, 4, 5, 6, 7
+    group by 1, 2, 3, 4, 5, 6
 ),
 
 score_bounds as (
@@ -73,7 +72,6 @@ select
     n.mode,
     n.lat,
     n.lon,
-    n.geog,
     n.nearby_mode_count,
     n.accessibility_score_raw,
     round(
