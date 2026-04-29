@@ -50,3 +50,7 @@ dbt_daily_selector: >-
   dim_station
   dim_weather_condition
   dim_pipeline_health
+  mart_ecobici_stockout_daily
+  mart_modal_substitution
+  mart_station_weather_sensitivity
+  mart_accessibility_score
