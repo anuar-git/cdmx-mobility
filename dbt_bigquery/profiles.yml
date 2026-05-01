@@ -1,0 +1,19 @@
+cdmx_mobility:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: cdmx-mobility-prod
+      dataset: marts_cdmx_dev
+      threads: 4
+      location: US
+      priority: interactive
+    prod:
+      type: bigquery
+      method: oauth
+      project: cdmx-mobility-prod
+      dataset: marts_cdmx
+      threads: 8
+      location: US
+      priority: interactive
