@@ -37,6 +37,15 @@ const NeighborsMap = dynamic(() => import("@/components/NeighborsMap"), {
   ),
 });
 
+const StationPickerMap = dynamic(() => import("@/components/StationPickerMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[380px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">
+      Loading map…
+    </div>
+  ),
+});
+
 export default function StationPage() {
   const [stations, setStations] = useState<StationRow[]>([]);
   const [selected, setSelected] = useState<StationRow | null>(null);
@@ -257,10 +266,21 @@ export default function StationPage() {
           </div>
         )}
 
-        {!selected && !loading && (
-          <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
-            Select a station above to explore its demand patterns.
-          </div>
+        {/* City-wide station picker map */}
+        {stations.length > 0 && (
+          <section>
+            <p className="text-xs text-slate-500 mb-2">
+              Click a station on the map or use the dropdown above
+            </p>
+            <div className="rounded-xl overflow-hidden">
+              <StationPickerMap
+                stations={stations}
+                selected={selected}
+                onSelect={setSelected}
+                height={380}
+              />
+            </div>
+          </section>
         )}
       </div>
     </div>

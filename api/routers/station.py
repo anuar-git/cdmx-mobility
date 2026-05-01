@@ -112,18 +112,32 @@ def station_neighbors(
 ) -> list[dict]:
     """Stations within radius_m metres, across all modes."""
     sql = """
+        WITH latest_ecobici AS (
+            SELECT
+                station_id,
+                ROUND(bikes_available_avg, 1)   AS bikes_available_avg,
+                ROUND(availability_ratio, 2)    AS availability_ratio
+            FROM `@project.marts_cdmx.fct_ecobici_station_hourly`
+            WHERE service_date >= DATE_SUB(CURRENT_DATE('America/Mexico_City'), INTERVAL 3 DAY)
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY station_id ORDER BY hour_ts DESC) = 1
+        )
         SELECT
             n.station_id,
             n.station_name,
             n.mode,
             n.lat,
             n.lon,
-            ROUND(ST_DISTANCE(s.geog, n.geog), 0)  AS distance_m
+            ROUND(ST_DISTANCE(s.geog, n.geog), 0)  AS distance_m,
+            e.bikes_available_avg,
+            e.availability_ratio
         FROM `@project.marts_cdmx.dim_station` s
         JOIN `@project.marts_cdmx.dim_station` n
             ON  n.station_key != s.station_key
             AND n.geog IS NOT NULL
             AND ST_DISTANCE(s.geog, n.geog) <= @radius_m
+        LEFT JOIN latest_ecobici e
+            ON  n.station_id = e.station_id
+            AND n.mode = 'ecobici'
         WHERE s.station_id = @station_id
           AND s.geog IS NOT NULL
         ORDER BY distance_m

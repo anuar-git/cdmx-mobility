@@ -51,7 +51,7 @@ function WeatherBanner({ w }: { w: WeatherRow }) {
       </div>
       <div>
         <p className="text-xs text-slate-400 uppercase tracking-wide">Temperature</p>
-        <p className="text-lg font-semibold text-white mt-0.5">{w.temperature_c}°C</p>
+        <p className="text-lg font-semibold text-white mt-0.5">{Math.round(w.temperature_c)}°C</p>
       </div>
       <div>
         <p className="text-xs text-slate-400 uppercase tracking-wide">Humidity</p>
@@ -63,7 +63,7 @@ function WeatherBanner({ w }: { w: WeatherRow }) {
       </div>
       <div>
         <p className="text-xs text-slate-400 uppercase tracking-wide">Comfort</p>
-        <p className="text-lg font-semibold text-white mt-0.5">{w.comfort_score}/5</p>
+        <p className="text-lg font-semibold text-white mt-0.5">{Math.round(w.comfort_score)}/100</p>
       </div>
       {w.is_adverse_weather && (
         <span className="ml-auto px-3 py-1 bg-red-800 text-red-200 text-xs font-bold rounded-full">
@@ -114,7 +114,7 @@ export default function PulsePage() {
         )}
 
         {/* Weather banner */}
-        {weather && <WeatherBanner w={weather} />}
+        {weather && weather.temperature_c != null && <WeatherBanner w={weather} />}
 
         {/* Ridership chart */}
         <section>

@@ -4,6 +4,7 @@ with ecobici_current as (
     select *
     from {{ ref('ecobici_station_snapshot') }}
     where dbt_valid_to is null
+    qualify row_number() over (partition by station_id order by dbt_updated_at desc) = 1
 ),
 
 metro as (

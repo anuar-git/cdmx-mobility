@@ -17,3 +17,4 @@ stations as (
 )
 
 select * from stations
+qualify row_number() over (partition by station_id order by ingestion_date desc) = 1

@@ -78,7 +78,12 @@ def pulse_stockout(
     Includes lat/lon for the Deck.gl ScatterplotLayer — radius scaled by
     stockout_minutes, color by availability_ratio.
     """
-    date_expr = f"DATE '{date}'" if date else "CURRENT_DATE('America/Mexico_City')"
+    if date:
+        date_expr = f"DATE '{date}'"
+    else:
+        date_expr = (
+            f"(SELECT MAX(service_date) FROM `{_PROJECT}.marts_cdmx.mart_ecobici_stockout_daily`)"
+        )
     sql = f"""
         SELECT
             station_id,
@@ -115,6 +120,7 @@ def pulse_weather() -> dict:
             is_adverse_weather
         FROM `{_PROJECT}.marts_cdmx.fct_unified_mobility_hourly`
         WHERE mode = 'ecobici'
+          AND temperature_c IS NOT NULL
         ORDER BY hour_ts DESC
         LIMIT 1
     """

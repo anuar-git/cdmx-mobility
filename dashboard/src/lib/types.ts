@@ -121,6 +121,8 @@ export interface NeighborRow {
   lat: number;
   lon: number;
   distance_m: number;
+  bikes_available_avg: number | null;
+  availability_ratio: number | null;
 }
 
 export interface ForecastRow {
