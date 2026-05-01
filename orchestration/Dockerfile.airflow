@@ -16,5 +16,12 @@ RUN apt-get update -qq && \
 
 USER airflow
 
-COPY airflow/requirements.txt /tmp/airflow-requirements.txt
-RUN pip install --no-cache-dir -r /tmp/airflow-requirements.txt
+# Install in stages so pip's backtracking resolver handles a smaller graph each time.
+# All three packages share google-cloud-*/protobuf transitive deps and cause
+# ResolutionTooDeep (200k rounds) when resolved together.
+RUN pip install --no-cache-dir \
+    "apache-airflow-providers-google==10.11.0" \
+    "apache-airflow-providers-slack==8.8.0" \
+    "apache-airflow-providers-http==4.13.0"
+RUN pip install --no-cache-dir "dbt-bigquery==1.9.0"
+RUN pip install --no-cache-dir "great-expectations==1.3.10"
