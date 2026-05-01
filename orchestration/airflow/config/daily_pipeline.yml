@@ -3,7 +3,7 @@ dag_id: daily_mobility_pipeline
 # so yesterday's Bronze is complete before this DAG fires.
 schedule: "0 8 * * *"
 start_date: "2026-04-18"
-catchup: true
+catchup: false
 max_active_runs: 1
 
 default_args:
