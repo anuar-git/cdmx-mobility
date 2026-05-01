@@ -68,6 +68,7 @@ services:
     volumes:
       - ../dbt_bigquery:/opt/dbt_bigquery:ro
       - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/config:/opt/airflow/config:ro
       - airflow-logs:/opt/airflow/logs
     restart: unless-stopped
     healthcheck:
@@ -91,6 +92,7 @@ services:
     env_file: .env
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/config:/opt/airflow/config:ro
       - airflow-logs:/opt/airflow/logs
     restart: unless-stopped
     healthcheck:
