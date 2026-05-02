@@ -34,7 +34,7 @@ from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJo
 from airflow.providers.google.cloud.operators.dataproc import (
     DataprocInstantiateWorkflowTemplateOperator,
 )
-from airflow.providers.google.cloud.sensors.gcs import GCSObjectExistenceSensor
+from airflow.providers.google.cloud.sensors.gcs import GCSObjectsWithPrefixExistenceSensor
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
 
 _CFG_PATH = Path(__file__).parent.parent / "config" / "daily_pipeline.yml"
@@ -125,30 +125,30 @@ def daily_mobility_pipeline() -> None:
     # ── 2. LANDING SENSORS ────────────────────────────────────────────────────
     @task_group(group_id="wait_for_landing")
     def sensors_group() -> None:
-        GCSObjectExistenceSensor(
+        GCSObjectsWithPrefixExistenceSensor(
             task_id="wait_weather",
             bucket=_DATA_BUCKET,
-            object=_CFG["landing_sensors"]["weather_prefix"],
+            prefix=_CFG["landing_sensors"]["weather_prefix"],
             google_cloud_conn_id="google_cloud_default",
             poke_interval=300,
             timeout=3600,
             mode="reschedule",
             sla=_SLA,
         )
-        GCSObjectExistenceSensor(
+        GCSObjectsWithPrefixExistenceSensor(
             task_id="wait_ecobici",
             bucket=_DATA_BUCKET,
-            object=_CFG["landing_sensors"]["ecobici_prefix"],
+            prefix=_CFG["landing_sensors"]["ecobici_prefix"],
             google_cloud_conn_id="google_cloud_default",
             poke_interval=60,
             timeout=1800,
             mode="reschedule",
             sla=_SLA,
         )
-        GCSObjectExistenceSensor(
+        GCSObjectsWithPrefixExistenceSensor(
             task_id="wait_metrobus",
             bucket=_DATA_BUCKET,
-            object=_CFG["landing_sensors"]["metrobus_prefix"],
+            prefix=_CFG["landing_sensors"]["metrobus_prefix"],
             google_cloud_conn_id="google_cloud_default",
             poke_interval=300,
             timeout=3600,
