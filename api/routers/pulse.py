@@ -24,7 +24,7 @@ def _q(sql: str) -> list[dict[str, Any]]:
 
 
 @router.get("/ridership")
-def pulse_ridership(days: int = Query(default=8, ge=2, le=30)) -> list[dict]:
+def pulse_ridership(days: int = Query(default=8, ge=2, le=90)) -> list[dict]:
     """Daily ridership per mode for the past N days.
 
     Returns one row per (service_date, mode). Metro comes from

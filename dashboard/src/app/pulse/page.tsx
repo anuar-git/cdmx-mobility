@@ -9,7 +9,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { api } from "@/lib/api";
@@ -25,21 +24,14 @@ const StockoutMap = dynamic(() => import("@/components/StockoutMap"), {
   ),
 });
 
-type RidershipDatum = {
-  service_date: string;
-  [mode: string]: string | number;
-};
+function sortByDate(rows: RidershipRow[]): RidershipRow[] {
+  return [...rows].sort((a, b) => (a.service_date < b.service_date ? -1 : 1));
+}
 
-function pivotRidership(rows: RidershipRow[]): RidershipDatum[] {
-  const byDate = new Map<string, RidershipDatum>();
-  for (const r of rows) {
-    if (!byDate.has(r.service_date))
-      byDate.set(r.service_date, { service_date: r.service_date });
-    byDate.get(r.service_date)![r.mode] = r.ridership;
-  }
-  return [...byDate.values()].sort((a, b) =>
-    a.service_date < b.service_date ? -1 : 1
-  );
+function yFormatter(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return String(v);
 }
 
 function WeatherBanner({ w }: { w: WeatherRow }) {
@@ -82,7 +74,7 @@ export default function PulsePage() {
 
   useEffect(() => {
     Promise.all([
-      api.pulseRidership(8),
+      api.pulseRidership(60),
       api.pulseStockout(20),
       api.pulseWeather(),
     ])
@@ -94,7 +86,9 @@ export default function PulsePage() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const ridershipData = pivotRidership(ridership);
+  const metroData    = sortByDate(ridership.filter((r) => r.mode === "metro"));
+  const metrobusData = sortByDate(ridership.filter((r) => r.mode === "metrobus")).slice(-8);
+  const ecobiciData  = sortByDate(ridership.filter((r) => r.mode === "ecobici")).slice(-8);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -116,67 +110,51 @@ export default function PulsePage() {
         {/* Weather banner */}
         {weather && weather.temperature_c != null && <WeatherBanner w={weather} />}
 
-        {/* Ridership chart */}
+        {/* Ridership charts — one per mode */}
         <section>
           <h2 className="text-base font-semibold text-slate-300 mb-3">
-            Daily ridership — last 8 days
+            Daily ridership
           </h2>
-          <div className="bg-slate-800 rounded-xl p-5">
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart
-                data={ridershipData}
-                margin={{ top: 4, right: 16, bottom: 0, left: 8 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis
-                  dataKey="service_date"
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickFormatter={(v: string) => v.slice(5)}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickFormatter={(v: number) =>
-                    v >= 1_000_000
-                      ? `${(v / 1_000_000).toFixed(1)}M`
-                      : v >= 1_000
-                        ? `${(v / 1_000).toFixed(0)}K`
-                        : String(v)
-                  }
-                  width={52}
-                />
-                <Tooltip
-                  contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
-                  labelStyle={{ color: "#cbd5e1" }}
-                  itemStyle={{ color: "#cbd5e1" }}
-                  formatter={(v: number) => v.toLocaleString()}
-                />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#94a3b8" }} />
-                <Line
-                  type="monotone"
-                  dataKey="metro"
-                  name="Metro"
-                  stroke={MODE_COLORS.metro.hex}
-                  dot={false}
-                  strokeWidth={2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="metrobus"
-                  name="Metrobús"
-                  stroke={MODE_COLORS.metrobus.hex}
-                  dot={false}
-                  strokeWidth={2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ecobici"
-                  name="EcoBici"
-                  stroke={MODE_COLORS.ecobici.hex}
-                  dot={false}
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {(
+              [
+                { label: "Metro",     data: metroData,    color: MODE_COLORS.metro.hex },
+                { label: "Metrobús",  data: metrobusData, color: MODE_COLORS.metrobus.hex },
+                { label: "EcoBici",   data: ecobiciData,  color: MODE_COLORS.ecobici.hex },
+              ] as const
+            ).map(({ label, data, color }) => (
+              <div key={label} className="bg-slate-800 rounded-xl p-4">
+                <p className="text-xs font-semibold mb-2" style={{ color }}>{label}</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis
+                      dataKey="service_date"
+                      tick={{ fontSize: 10, fill: "#94a3b8" }}
+                      tickFormatter={(v: string) => v.slice(5)}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "#94a3b8" }}
+                      tickFormatter={yFormatter}
+                      width={48}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
+                      labelStyle={{ color: "#cbd5e1", fontSize: 11 }}
+                      itemStyle={{ color: "#cbd5e1", fontSize: 11 }}
+                      formatter={(v: number) => [v.toLocaleString(), label]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ridership"
+                      stroke={color}
+                      dot={false}
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ))}
           </div>
         </section>
 

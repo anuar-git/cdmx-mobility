@@ -2,13 +2,12 @@
 
 Stages:
   1. ingest  — trigger Cloud Run ingestor jobs (weather, EcoBici, Metrobús email).
-               Metro affluence ingest is handled by CI cron; a landing sensor
-               waits for its GCS object regardless of how it arrived.
   2. sensors — GCSObjectExistenceSensor on each Bronze prefix for {{ ds }}.
                mode="reschedule" releases the worker slot between pokes.
-  3. spark   — DataprocInstantiateWorkflowTemplateOperator, two parallel pairs
-               to respect the 10-vCPU CPUS_ALL_REGIONS quota (8 vCPUs/cluster).
-               Pair 1: weather + metro. Pair 2: ecobici + metrobus.
+  3. spark   — DataprocInstantiateWorkflowTemplateOperator, one anchor (weather)
+               then two parallel jobs (ecobici + metrobus), to respect the
+               10-vCPU CPUS_ALL_REGIONS quota (8 vCPUs/cluster).
+               Metro affluence Spark runs separately in monthly_metro_pipeline.
   4. gx      — Great Expectations validation on all four Silver tables.
                Writes one summary row per suite to meta_cdmx.gx_validation_results.
   5. dbt     — dbt build (create/replace tables) then dbt test.
@@ -37,7 +36,6 @@ from airflow.providers.google.cloud.operators.dataproc import (
 )
 from airflow.providers.google.cloud.sensors.gcs import GCSObjectExistenceSensor
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
-from airflow.utils.helpers import cross_downstream
 
 _CFG_PATH = Path(__file__).parent.parent / "config" / "daily_pipeline.yml"
 _CFG = yaml.safe_load(_CFG_PATH.read_text())
@@ -45,7 +43,6 @@ _CFG = yaml.safe_load(_CFG_PATH.read_text())
 _PROJECT = _CFG["gcp_project"]
 _REGION = _CFG["region"]
 _DATA_BUCKET = _CFG["gcs_data_bucket"]
-_RAW_BUCKET = _CFG["gcs_raw_bucket"]
 _SLA = datetime.timedelta(seconds=_CFG["sla_miss_seconds"])
 
 _DEFAULT_ARGS: dict = {
@@ -158,20 +155,11 @@ def daily_mobility_pipeline() -> None:
             mode="reschedule",
             sla=_SLA,
         )
-        GCSObjectExistenceSensor(
-            task_id="wait_metro",
-            bucket=_RAW_BUCKET,
-            object=_CFG["landing_sensors"]["metro_prefix"],
-            google_cloud_conn_id="google_cloud_default",
-            poke_interval=300,
-            timeout=3600,
-            mode="reschedule",
-            sla=_SLA,
-        )
 
     # ── 3. SPARK BRONZE → SILVER ──────────────────────────────────────────────
-    # Two parallel pairs to respect the 10-vCPU CPUS_ALL_REGIONS quota.
-    # Pair 1 (weather + metro) completes before pair 2 (ecobici + metrobus) starts.
+    # weather completes first, then ecobici + metrobus run in parallel.
+    # Respects the 10-vCPU CPUS_ALL_REGIONS quota (8 vCPUs/cluster max).
+    # Metro Silver runs separately in monthly_metro_pipeline.
     @task_group(group_id="spark_silver")
     def spark_group() -> None:
         spark_weather = DataprocInstantiateWorkflowTemplateOperator(
@@ -179,14 +167,6 @@ def daily_mobility_pipeline() -> None:
             project_id=_PROJECT,
             region=_REGION,
             template_id=_CFG["dataproc_templates"]["weather"],
-            parameters={"INPUT_DATE": "{{ ds }}"},
-            sla=_SLA,
-        )
-        spark_metro = DataprocInstantiateWorkflowTemplateOperator(
-            task_id="spark_metro",
-            project_id=_PROJECT,
-            region=_REGION,
-            template_id=_CFG["dataproc_templates"]["metro"],
             parameters={"INPUT_DATE": "{{ ds }}"},
             sla=_SLA,
         )
@@ -207,7 +187,7 @@ def daily_mobility_pipeline() -> None:
             sla=_SLA,
         )
 
-        cross_downstream([spark_weather, spark_metro], [spark_ecobici, spark_metrobus])
+        spark_weather >> [spark_ecobici, spark_metrobus]
 
     # ── 4. GREAT EXPECTATIONS — SILVER VALIDATION ────────────────────────────
     # Runs after Silver is written, before dbt consumes it. Validates a

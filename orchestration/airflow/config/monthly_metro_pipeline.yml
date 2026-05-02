@@ -1,0 +1,29 @@
+dag_id: monthly_metro_pipeline
+# Fires on the 1st of each month at 10:00 UTC.
+# CI cron (06:00 CDMX daily) polls datos.cdmx.gob.mx; the sensor below waits
+# up to 25 days for a new Bronze partition to appear before triggering Spark.
+schedule: "0 10 1 * *"
+start_date: "2026-05-01"
+catchup: false
+max_active_runs: 1
+
+default_args:
+  retries: 2
+  retry_delay_minutes: 5
+  retry_exponential_backoff: true
+  email_on_failure: true
+  email: anuar.hage@gmail.com
+
+# 24 h — metro Silver is not time-critical.
+sla_miss_seconds: 86400
+
+gcp_project: cdmx-mobility-prod
+gcs_raw_bucket: cdmx-mobility-raw
+region: us-central1
+
+dataproc_template: cdmx-spark-metro
+
+# Prefix covering any CI upload in the current month.
+# GCSObjectsWithPrefixExistenceSensor matches any object under this prefix.
+# ds[:7] renders as YYYY-MM (e.g. "2026-05").
+metro_bronze_prefix: "metro/affluence_simple/ingestion_date={{ ds[:7] }}"

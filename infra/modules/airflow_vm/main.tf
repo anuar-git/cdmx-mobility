@@ -20,6 +20,7 @@ resource "google_service_account" "airflow" {
 locals {
   airflow_roles = [
     "roles/run.invoker",                  # trigger Cloud Run jobs
+    "roles/run.viewer",                   # poll run.operations.get after triggering
     "roles/dataproc.editor",              # instantiate workflow templates
     "roles/dataproc.worker",              # cluster SA binding
     "roles/bigquery.dataEditor",          # dbt writes to marts_cdmx

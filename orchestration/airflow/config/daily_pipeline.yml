@@ -18,12 +18,10 @@ sla_miss_seconds: 7200
 
 gcp_project: cdmx-mobility-prod
 gcs_data_bucket: cdmx-mobility-data
-gcs_raw_bucket: cdmx-mobility-raw
 region: us-central1
 
 dataproc_templates:
   weather:  cdmx-spark-weather
-  metro:    cdmx-spark-metro
   ecobici:  cdmx-spark-ecobici
   metrobus: cdmx-spark-metrobus
 
@@ -34,10 +32,11 @@ cloud_run_jobs:
   weather_ingest:   weather-ingest
 
 # GCS prefixes probed by landing sensors before Spark is launched.
-# {{ ds }} is Airflow's logical date (YYYY-MM-DD).
+# Weather uses yesterday_ds — the ingestor fetches the preceding 24 hours
+# and writes under the previous day's partition.
+# Metro is handled by monthly_metro_pipeline; no sensor here.
 landing_sensors:
-  metro_prefix:    "metro/affluence/ingestion_date={{ ds }}/"
-  weather_prefix:  "weather/hourly/ingestion_date={{ ds }}/"
+  weather_prefix:  "weather/hourly/ingestion_date={{ yesterday_ds }}/"
   metrobus_prefix: "metrobus/vehicle_positions/ingestion_date={{ ds }}/"
   ecobici_prefix:  "ecobici/station_status/ingestion_ts={{ ds }}T"
 
