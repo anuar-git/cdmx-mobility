@@ -109,9 +109,9 @@ def _run_single_validation(
         }
 
     context = gx.get_context(mode="ephemeral")
-    datasource = context.sources.add_pandas(f"pandas_{suite_name}")
+    datasource = context.data_sources.add_pandas(f"pandas_{suite_name}")
     asset = datasource.add_dataframe_asset(suite_name)
-    batch_request = asset.build_batch_request(dataframe=df)
+    batch_request = asset.build_batch_request(options={"dataframe": df})
 
     context.add_or_update_expectation_suite(suite_name)
     validator = context.get_validator(
