@@ -69,6 +69,7 @@ services:
       - ../dbt_bigquery:/opt/dbt_bigquery:ro
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/config:/opt/airflow/config:ro
+      - ./airflow/scripts:/opt/airflow/scripts:ro
       - airflow-logs:/opt/airflow/logs
     restart: unless-stopped
     healthcheck:
