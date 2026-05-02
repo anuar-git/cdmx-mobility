@@ -114,7 +114,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
 
     validation {
       regex {
-        regexes = ["^\\d{4}-\\d{2}-\\d{2}$", "^$"]
+        regexes = ["^(\\d{4}-\\d{2}-\\d{2})?$"]
       }
     }
   }
