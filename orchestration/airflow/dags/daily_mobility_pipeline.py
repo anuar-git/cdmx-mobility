@@ -211,6 +211,7 @@ def daily_mobility_pipeline() -> None:
         ),
         params={"selector": _CFG["dbt_daily_selector"].strip()},
         env={"GCP_PROJECT_ID": _PROJECT},
+        append_env=True,
         sla=_SLA,
     )
 
@@ -224,6 +225,7 @@ def daily_mobility_pipeline() -> None:
         ),
         params={"selector": _CFG["dbt_daily_selector"].strip()},
         env={"GCP_PROJECT_ID": _PROJECT},
+        append_env=True,
         sla=_SLA,
     )
 
