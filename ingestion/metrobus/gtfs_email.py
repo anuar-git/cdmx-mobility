@@ -44,10 +44,13 @@ def _store_secret(project_id: str, secret_id: str, value: str) -> None:
     new_version = client.add_secret_version(
         request={"parent": parent, "payload": {"data": value.encode()}}
     )
-    # Destroy all previous versions immediately — each active version is billed
-    # at $0.06/month, and this secret is updated every 5 minutes (288x/day).
+    # Destroy only versions older than the one we just created — each active
+    # version is billed at $0.06/month (288 updates/day). Comparing by version
+    # number (not name equality) prevents concurrent executions from destroying
+    # each other's newly-written versions.
+    new_version_num = int(new_version.name.split("/")[-1])
     for version in client.list_secret_versions(request={"parent": parent}):
-        if version.name != new_version.name and int(version.state) != 3:
+        if int(version.name.split("/")[-1]) < new_version_num and int(version.state) != 3:
             client.destroy_secret_version(request={"name": version.name})
 
 

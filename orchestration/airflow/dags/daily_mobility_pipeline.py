@@ -167,7 +167,7 @@ def daily_mobility_pipeline() -> None:
             project_id=_PROJECT,
             region=_REGION,
             template_id=_CFG["dataproc_templates"]["weather"],
-            parameters={"INPUT_DATE": "{{ ds }}"},
+            parameters={"INPUT_DATE": "{{ yesterday_ds }}"},
             sla=_SLA,
         )
         spark_ecobici = DataprocInstantiateWorkflowTemplateOperator(

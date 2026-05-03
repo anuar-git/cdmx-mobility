@@ -131,13 +131,18 @@ def _load_hourly(spark: SparkSession, input_path: str) -> DataFrame:
     """
     raw = spark.read.json(input_path)
 
+    # Cast all numeric arrays to double to prevent INT64/FLOAT64 Parquet type
+    # mismatches. Open-Meteo returns integer values (e.g. humidity=50) whenever
+    # all observations in a file happen to be whole numbers, causing Spark JSON
+    # inference to choose LongType — which conflicts with the FLOAT64 BigQuery
+    # external table schema on subsequent partitions that infer DoubleType.
     with_named = raw.select(
         col("coordinate_id"),
         col("hourly.time").alias("time_arr"),
-        col("hourly.temperature_2m").alias("temp_arr"),
-        col("hourly.precipitation").alias("precip_arr"),
-        col("hourly.windspeed_10m").alias("wind_arr"),
-        col("hourly.relativehumidity_2m").alias("humidity_arr"),
+        col("hourly.temperature_2m").cast("array<double>").alias("temp_arr"),
+        col("hourly.precipitation").cast("array<double>").alias("precip_arr"),
+        col("hourly.windspeed_10m").cast("array<double>").alias("wind_arr"),
+        col("hourly.relativehumidity_2m").cast("array<double>").alias("humidity_arr"),
     )
 
     with_zipped = with_named.withColumn(
