@@ -204,6 +204,7 @@ def daily_mobility_pipeline() -> None:
         task_id="dbt_build",
         bash_command=(
             "cd /opt/dbt_bigquery && "
+            "dbt deps --profiles-dir /opt/dbt_bigquery --target prod && "
             "dbt build "
             "--select {{ params.selector }} "
             '--vars \'{"run_date": "{{ ds }}"}\' '
