@@ -12,7 +12,12 @@
 -- apply; daily_entries is the complete daily count for that station-line pair.
 
 with silver as (
-    select * from {{ ref('stg_silver_metro_affluence') }}
+    select service_date, linea, station_canonical, daily_entries
+    from {{ ref('stg_silver_metro_affluence') }}
+    qualify row_number() over (
+        partition by service_date, linea, station_canonical
+        order by daily_entries desc
+    ) = 1
 ),
 
 dim_sta as (
