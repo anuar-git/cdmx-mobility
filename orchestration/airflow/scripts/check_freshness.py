@@ -6,7 +6,7 @@ AirflowException if any SLA is violated so the on_failure_callback fires
 the Slack alert.
 
 SLA targets (all measured from current UTC wall-clock time):
-  ecobici  — 10 min   (Cloud Run job every 10 min + Spark within 30 min of DAG start)
+  ecobici  — 90 min   (Silver refreshed hourly at :05; worst-case lag ~79 min before next run)
   weather  — 1440 min (obs_timestamp is yesterday end-of-day; daily ingest is ~12 h stale
                         at check time — 24 h gives a full daily buffer)
   metro    — 64800 min (monthly CKAN pull; 45-day window catches a missed monthly ingest)
@@ -19,7 +19,7 @@ import datetime
 
 # (canonical_source, bq_table, timestamp_column, sla_minutes)
 _CHECKS: list[tuple[str, str, str, int]] = [
-    ("ecobici", "ecobici_state_changes", "snapshot_ts", 10),
+    ("ecobici", "ecobici_state_changes", "snapshot_ts", 90),
     ("weather", "weather_hourly_fact", "obs_timestamp", 1440),
     ("metro", "metro_affluence", "service_date", 64800),
     ("metrobus", "metrobus_stop_events", "dwell_start_ts", 60),
