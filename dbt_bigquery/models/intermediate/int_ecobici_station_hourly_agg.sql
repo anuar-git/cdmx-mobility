@@ -48,8 +48,10 @@ select
     service_date,
     obs_hour,
     count(*)                                                        as observation_count,
-    sum(duration_seconds)                                           as total_seconds,
-    sum(duration_seconds) / 60.0                                   as observed_minutes,
+    sum(duration_seconds)                                                   as total_seconds,
+    -- Cap at 60 min: dense snapshots (7+ per hour due to polling jitter) can
+    -- otherwise produce observed_minutes > 60, which breaks the stockout test.
+    least(sum(duration_seconds) / 60.0, 60.0)                          as observed_minutes,
     safe_divide(
         sum(num_bikes_available * duration_seconds),
         sum(duration_seconds)
@@ -59,12 +61,14 @@ select
         sum(num_docks_available * duration_seconds),
         sum(duration_seconds)
     )                                                               as avg_docks_available,
-    sum(
-        case when num_bikes_available = 0 then duration_seconds else 0 end
-    ) / 60.0                                                        as stockout_minutes,
-    sum(
-        case when num_docks_available = 0 then duration_seconds else 0 end
-    ) / 60.0                                                        as full_minutes,
+    least(
+        sum(case when num_bikes_available = 0 then duration_seconds else 0 end) / 60.0,
+        60.0
+    )                                                               as stockout_minutes,
+    least(
+        sum(case when num_docks_available = 0 then duration_seconds else 0 end) / 60.0,
+        60.0
+    )                                                               as full_minutes,
     safe_divide(
         sum(case when is_renting then duration_seconds else 0 end),
         sum(duration_seconds)
