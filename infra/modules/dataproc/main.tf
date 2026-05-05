@@ -48,9 +48,6 @@ resource "google_dataproc_workflow_template" "spark_job" {
       config {
         gce_cluster_config {
           # No zone — Dataproc Auto Zone picks the zone with available capacity.
-          # internal_ip_only avoids consuming IN_USE_ADDRESSES quota (limit: 8).
-          # GCS/BQ access works via Private Google Access on the default subnet.
-          internal_ip_only       = true
           service_account        = var.service_account_email
           service_account_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
         }
