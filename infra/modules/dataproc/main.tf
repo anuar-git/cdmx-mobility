@@ -54,19 +54,19 @@ resource "google_dataproc_workflow_template" "spark_job" {
 
         master_config {
           num_instances = 1
-          machine_type  = "n1-standard-2"
+          machine_type  = "e2-standard-2"
           disk_config {
             boot_disk_type    = "pd-standard"
             boot_disk_size_gb = 50
           }
         }
 
-        # 3 workers × n1-standard-2 → 6 vCPUs; total cluster = 8 vCPUs.
+        # 3 workers × e2-standard-2 → 6 vCPUs; total cluster = 8 vCPUs.
         # Fits within the 10-vCPU CPUS_ALL_REGIONS project quota.
         # Ephemeral cost: ~$0.095/node/hr × 4 nodes × 0.5 hr ≈ $0.19 per run.
         worker_config {
           num_instances = 3
-          machine_type  = "n1-standard-2"
+          machine_type  = "e2-standard-2"
           disk_config {
             boot_disk_type    = "pd-standard"
             boot_disk_size_gb = 50
