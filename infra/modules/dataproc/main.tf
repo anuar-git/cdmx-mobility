@@ -47,7 +47,7 @@ resource "google_dataproc_workflow_template" "spark_job" {
 
       config {
         gce_cluster_config {
-          zone                   = "${var.region}-a"
+          # No zone — Dataproc Auto Zone picks the zone with available capacity.
           service_account        = var.service_account_email
           service_account_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
         }
