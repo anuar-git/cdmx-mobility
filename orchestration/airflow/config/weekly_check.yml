@@ -14,6 +14,7 @@ lookback_days: 7
 checks:
   - model: fct_metro_affluence_daily
     dataset: marts_cdmx
+    lookback_days: 60
     expectations:
       - type: expect_column_values_to_not_be_null
         kwargs:

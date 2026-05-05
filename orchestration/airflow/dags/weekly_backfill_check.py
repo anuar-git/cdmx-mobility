@@ -54,9 +54,10 @@ def weekly_backfill_check() -> None:
             table = f"{_PROJECT}.{dataset}.{model}"
 
             # Limit the query to the lookback window for efficiency.
+            lookback = check_spec.get("lookback_days", _LOOKBACK)
             query = (
                 f"SELECT * FROM `{table}` "
-                f"WHERE service_date >= DATE_SUB('{ds}', INTERVAL {_LOOKBACK} DAY) "
+                f"WHERE service_date >= DATE_SUB('{ds}', INTERVAL {lookback} DAY) "
                 f"  AND service_date <= '{ds}'"
             )
             df = bq.query(query).to_dataframe()
