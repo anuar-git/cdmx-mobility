@@ -143,3 +143,57 @@ Run the metro ingestor manually from a local machine once per month after CKAN r
 new data (typically mid-month for the prior month). The `monthly_metro_pipeline` DAG
 sensor (`GCSObjectsWithPrefixExistenceSensor`, up to 25-day timeout) fires automatically
 once the Bronze partition lands in GCS — no further manual steps required after upload.
+
+---
+
+## dbt in Airflow scheduler — writable mount + append_env + dbt deps
+
+**Date:** 2026-05-03
+**Status:** Decision made — three related issues resolved together
+
+### Background
+
+The `dbt_build` and `dbt_test` Airflow tasks failed with a series of errors that shared a
+common root: the dbt execution environment inside the scheduler container was not properly
+configured.
+
+### Issues and resolutions
+
+**1. Exit 127 — `dbt` not found**
+
+`BashOperator(env={"GCP_PROJECT_ID": ...})` replaces the entire subprocess environment,
+stripping `PATH`. The `dbt` binary at `/home/airflow/.local/bin/dbt` was unreachable.
+
+Fix: add `append_env=True` to both `dbt_build` and `dbt_test` operators so the custom
+env var is merged into the existing process environment instead of replacing it.
+
+**2. Exit 2 — `dbt deps` not run / no write access**
+
+`dbt build` failed immediately because `dbt_packages/` did not exist. `dbt deps` must run
+first to install `dbt_date`, `dbt_expectations`, and `dbt_utils`. Additionally, the
+`dbt_bigquery` volume was mounted `:ro`, so dbt could not create `dbt_packages/`, `logs/`,
+or `target/` even after `dbt deps` was added to the command.
+
+Two fixes:
+- Remove `:ro` from the `../dbt_bigquery:/opt/dbt_bigquery` volume mount in
+  `docker-compose.yml` (scheduler service only — the webserver never runs dbt).
+- Prepend `dbt deps --profiles-dir /opt/dbt_bigquery --target prod &&` to the
+  `dbt_build` bash command.
+
+**3. `chmod g+w` on host — directory owned by root**
+
+The `/opt/cdmx-mobility` repo is cloned and owned by root (the sync cron runs as root).
+The Airflow container user (uid=50000, gid=0) cannot write to `root:root 755` directories
+even without `:ro`. Applying `sudo chmod g+w /opt/cdmx-mobility/dbt_bigquery` on the VM
+grants the root group write access; since airflow's gid=0, it can write.
+
+This permission must be re-applied if the repo is ever re-cloned. A permanent alternative
+would be to run `dbt deps` during the Docker image build (baking packages into the image),
+but this would require rebuilding on every `packages.yml` change.
+
+### Decision
+
+Keep the current approach (runtime `dbt deps` + host `chmod g+w`) for simplicity. The
+`dbt_packages/` directory persists across scheduler restarts as long as the container is
+not fully recreated. If packages are needed in a fresh container, `dbt deps` re-installs
+them automatically at the start of each `dbt_build` run.

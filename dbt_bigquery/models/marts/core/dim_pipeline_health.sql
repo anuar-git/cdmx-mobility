@@ -12,19 +12,19 @@
 -- observability table for the pipeline health dashboard.
 --
 -- Canonical source mapping (ingestion_log → freshness_sla_log namespace):
---   ecobici_*       → ecobici
---   metro_affluence → metro
---   metrobus_*      → metrobus
---   weather_*       → weather
+--   ecobici_* / spark_ecobici_* → ecobici
+--   metrobus_* / spark_metrobus_* → metrobus   (must precede metro% check)
+--   metro_* / spark_metro_*     → metro
+--   weather_* / spark_weather_* → weather
 
 with ingestion as (
     select
         date(ingested_at)                                       as run_date,
         case
-            when source like 'ecobici%'   then 'ecobici'
-            when source like 'metro%'     then 'metro'
-            when source like 'metrobus%'  then 'metrobus'
-            when source like 'weather%'   then 'weather'
+            when source like 'ecobici%'  or source like 'spark_ecobici%'   then 'ecobici'
+            when source like 'metrobus%' or source like 'spark_metrobus%'  then 'metrobus'
+            when source like 'metro%'    or source like 'spark_metro%'     then 'metro'
+            when source like 'weather%'  or source like 'spark_weather%'   then 'weather'
             else source
         end                                                     as canonical_source,
         max(ingested_at)                                        as last_ingested_at,
