@@ -113,10 +113,10 @@ def _run_single_validation(
     asset = datasource.add_dataframe_asset(suite_name)
     batch_request = asset.build_batch_request(options={"dataframe": df})
 
-    context.add_or_update_expectation_suite(suite_name)
+    suite = context.suites.add(gx.ExpectationSuite(name=suite_name))
     validator = context.get_validator(
         batch_request=batch_request,
-        expectation_suite_name=suite_name,
+        expectation_suite=suite,
     )
 
     # Apply the expectations registered for this suite
