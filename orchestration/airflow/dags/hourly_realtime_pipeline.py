@@ -88,6 +88,7 @@ def hourly_realtime_pipeline() -> None:
         ),
         params={"selector": _CFG["dbt_selector"]},
         env={"GCP_PROJECT_ID": _PROJECT},
+        append_env=True,
     )
 
     trigger >> wait >> spark >> dbt_refresh
