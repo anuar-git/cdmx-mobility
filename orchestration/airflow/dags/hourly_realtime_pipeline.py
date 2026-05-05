@@ -27,7 +27,7 @@ from airflow.providers.google.cloud.operators.cloud_run import CloudRunExecuteJo
 from airflow.providers.google.cloud.operators.dataproc import (
     DataprocInstantiateWorkflowTemplateOperator,
 )
-from airflow.providers.google.cloud.sensors.gcs import GCSObjectExistenceSensor
+from airflow.providers.google.cloud.sensors.gcs import GCSObjectsWithPrefixExistenceSensor
 
 _CFG_PATH = Path(__file__).parent.parent / "config" / "hourly_pipeline.yml"
 _CFG = yaml.safe_load(_CFG_PATH.read_text())
@@ -58,12 +58,13 @@ def hourly_realtime_pipeline() -> None:
         job_name=_CFG["cloud_run_job"],
     )
 
-    # Wait for a snapshot whose prefix matches the current hour, e.g.
-    # ecobici/station_status/ingestion_ts=2026-04-27T14
-    wait = GCSObjectExistenceSensor(
+    # Wait for any snapshot whose prefix matches the current hour, e.g.
+    # ecobici/station_status/ingestion_ts=2026-04-27T14 matches
+    # ecobici/station_status/ingestion_ts=2026-04-27T14-05/station_status.json
+    wait = GCSObjectsWithPrefixExistenceSensor(
         task_id="wait_for_snapshot",
         bucket=_BUCKET,
-        object="ecobici/station_status/ingestion_ts={{ execution_date.strftime('%Y-%m-%dT%H') }}",
+        prefix="ecobici/station_status/ingestion_ts={{ execution_date.strftime('%Y-%m-%dT%H') }}",
         google_cloud_conn_id="google_cloud_default",
         poke_interval=_CFG["ecobici_sensor_poke_interval_seconds"],
         timeout=_CFG["ecobici_sensor_timeout_seconds"],
