@@ -157,8 +157,10 @@ def daily_mobility_pipeline() -> None:
         )
 
     # ── 3. SPARK BRONZE → SILVER ──────────────────────────────────────────────
-    # weather completes first, then ecobici + metrobus run in parallel.
-    # Respects the 10-vCPU CPUS_ALL_REGIONS quota (8 vCPUs/cluster max).
+    # Jobs run sequentially: weather → ecobici → metrobus.
+    # Parallel execution was limited by IN_USE_ADDRESSES quota (8 external IPs):
+    # Airflow VM (1) + two clusters (4+4) = 9, which exceeds the quota.
+    # Sequential peak is 5 IPs (VM + one cluster). Adds ~15-30 min vs parallel.
     # Metro Silver runs separately in monthly_metro_pipeline.
     @task_group(group_id="spark_silver")
     def spark_group() -> None:
@@ -187,7 +189,7 @@ def daily_mobility_pipeline() -> None:
             sla=_SLA,
         )
 
-        spark_weather >> [spark_ecobici, spark_metrobus]
+        spark_weather >> spark_ecobici >> spark_metrobus
 
     # ── 4. GREAT EXPECTATIONS — SILVER VALIDATION ────────────────────────────
     # Runs after Silver is written, before dbt consumes it. Validates a
