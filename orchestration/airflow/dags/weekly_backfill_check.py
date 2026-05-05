@@ -62,17 +62,17 @@ def weekly_backfill_check() -> None:
             df = bq.query(query).to_dataframe()
 
             ctx = gx.get_context(mode="ephemeral")
-            source = ctx.sources.add_pandas(name=model)
-            asset = source.add_dataframe_asset(name=model)
-            batch_req = asset.build_batch_request(dataframe=df)
+            source = ctx.data_sources.add_pandas(f"pandas_{model}")
+            asset = source.add_dataframe_asset(model)
+            batch_req = asset.build_batch_request(options={"dataframe": df})
 
-            suite = ctx.add_expectation_suite(expectation_suite_name=model)
+            suite = ctx.suites.add(gx.ExpectationSuite(name=model))
+            validator = ctx.get_validator(batch_request=batch_req, expectation_suite=suite)
             for exp in check_spec["expectations"]:
                 exp_type = exp["type"]
                 exp_kwargs = exp.get("kwargs", {})
-                getattr(suite, f"add_{exp_type}")(**exp_kwargs)
+                getattr(validator, exp_type)(**exp_kwargs)
 
-            validator = ctx.get_validator(batch_request=batch_req, expectation_suite=suite)
             result = validator.validate()
 
             results[model] = {

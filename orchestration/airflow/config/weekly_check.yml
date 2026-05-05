@@ -17,10 +17,10 @@ checks:
     expectations:
       - type: expect_column_values_to_not_be_null
         kwargs:
-          column: total_entries
+          column: daily_entries
       - type: expect_column_values_to_be_between
         kwargs:
-          column: total_entries
+          column: daily_entries
           min_value: 0
           max_value: 5000000
 
@@ -29,13 +29,13 @@ checks:
     expectations:
       - type: expect_column_values_to_not_be_null
         kwargs:
-          column: available_bikes
+          column: bikes_available_avg
       - type: expect_table_row_count_to_be_between
         kwargs:
           min_value: 1
           max_value: 10000000
 
-  - model: fct_metrobus_stop_events_daily
+  - model: fct_metrobus_stop_events
     dataset: marts_cdmx
     expectations:
       - type: expect_table_row_count_to_be_between
