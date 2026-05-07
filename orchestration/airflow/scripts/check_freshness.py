@@ -6,11 +6,14 @@ AirflowException if any SLA is violated so the on_failure_callback fires
 the Slack alert.
 
 SLA targets (all measured from current UTC wall-clock time):
-  ecobici  — 90 min   (Silver refreshed hourly at :05; worst-case lag ~79 min before next run)
-  weather  — 1440 min (obs_timestamp is yesterday end-of-day; daily ingest is ~12 h stale
+  ecobici  — 180 min  (Silver refreshed hourly while VM is up 07:30-15:30 UTC; 180 min
+                        covers Spark startup variance and the VM boot window)
+  weather  — 1440 min (obs_timestamp is yesterday end-of-day; daily ingest is ~5-7 h stale
                         at check time — 24 h gives a full daily buffer)
   metro    — 64800 min (monthly CKAN pull; 45-day window catches a missed monthly ingest)
-  metrobus — 60 min   (sinopticoplus email ingest every 5 min + Spark)
+  metrobus — 720 min  (service stops ~01:00 CDMX / 07:00 UTC; check runs ~14:00 UTC;
+                        gap is 7 h. 720 min catches a missed daily Silver run without
+                        false-alerting on normal overnight service gaps)
 """
 
 from __future__ import annotations
@@ -19,10 +22,10 @@ import datetime
 
 # (canonical_source, bq_table, timestamp_column, sla_minutes)
 _CHECKS: list[tuple[str, str, str, int]] = [
-    ("ecobici", "ecobici_state_changes", "snapshot_ts", 90),
+    ("ecobici", "ecobici_state_changes", "snapshot_ts", 180),
     ("weather", "weather_hourly_fact", "obs_timestamp", 1440),
     ("metro", "metro_affluence", "service_date", 64800),
-    ("metrobus", "metrobus_stop_events", "dwell_start_ts", 60),
+    ("metrobus", "metrobus_stop_events", "dwell_start_ts", 720),
 ]
 
 
