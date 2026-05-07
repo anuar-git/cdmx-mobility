@@ -120,6 +120,78 @@ resource "google_dataproc_workflow_template" "spark_job" {
   }
 }
 
+# Single-node cluster for the hourly EcoBici Silver refresh.
+# 1 master + 0 workers = 1 IP, vs 4 IPs for the full daily template.
+# This prevents IN_USE_ADDRESSES quota exhaustion when the daily pipeline
+# Spark job overlaps with the hourly :05 trigger (VM=1 + daily=4 + hourly=1 = 6 ≤ 8).
+resource "google_dataproc_workflow_template" "spark_ecobici_hourly" {
+  name        = "cdmx-spark-ecobici-hourly"
+  location    = var.region
+  dag_timeout = "3600s"
+
+  placement {
+    managed_cluster {
+      cluster_name = "cdmx-spark-ecobici-hourly-ephemeral"
+
+      config {
+        gce_cluster_config {
+          service_account        = var.service_account_email
+          service_account_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+        }
+
+        master_config {
+          num_instances = 1
+          machine_type  = "e2-standard-2"
+          disk_config {
+            boot_disk_type    = "pd-standard"
+            boot_disk_size_gb = 50
+          }
+        }
+
+        # Single-node mode: 0 workers, master handles all Spark tasks.
+        # Uses only 1 IP vs 4 for the standard template, preventing quota
+        # exhaustion when the daily pipeline cluster is still running.
+        # Sufficient for one hour of incremental EcoBici data (~6-9 snapshots).
+        software_config {
+          image_version = "2.2-debian12"
+          properties = {
+            "dataproc:dataproc.allow.zero.workers" = "true"
+          }
+        }
+
+        initialization_actions {
+          executable_file   = "gs://${var.bucket_name}/code/dataproc/init.sh"
+          execution_timeout = "300s"
+        }
+      }
+    }
+  }
+
+  jobs {
+    step_id = "spark-job"
+    pyspark_job {
+      main_python_file_uri = "gs://${var.bucket_name}/code/spark_jobs/bronze_to_silver_ecobici.py"
+      python_file_uris = [
+        "gs://${var.bucket_name}/code/spark_jobs/spark_jobs.zip",
+        "gs://${var.bucket_name}/code/spark_jobs/ingestion.zip",
+      ]
+      args = ["--gcp-project-id", var.project_id, "--input-date", "{{INPUT_DATE}}"]
+    }
+  }
+
+  parameters {
+    name        = "INPUT_DATE"
+    description = "Bronze partition to process (YYYY-MM-DD). Empty = all partitions."
+    fields      = ["jobs['spark-job'].pysparkJob.args[3]"]
+
+    validation {
+      regex {
+        regexes = ["^(\\d{4}-\\d{2}-\\d{2})?$"]
+      }
+    }
+  }
+}
+
 output "workflow_template_ids" {
   description = "Map of job key to Dataproc workflow template short name"
   value       = { for k, v in google_dataproc_workflow_template.spark_job : k => v.name }

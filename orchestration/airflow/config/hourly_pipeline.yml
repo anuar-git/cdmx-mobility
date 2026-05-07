@@ -15,7 +15,7 @@ gcs_data_bucket: cdmx-mobility-data
 region: us-central1
 
 cloud_run_job: ecobici-ingest
-dataproc_template: cdmx-spark-ecobici
+dataproc_template: cdmx-spark-ecobici-hourly
 
 # Sensor: wait for at least one snapshot in the current hour.
 # Probes for the prefix ingestion_ts=<YYYY-MM-DD>T<HH>
