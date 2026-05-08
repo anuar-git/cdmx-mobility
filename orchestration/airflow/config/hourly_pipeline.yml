@@ -22,4 +22,4 @@ dataproc_template: cdmx-spark-ecobici-hourly
 ecobici_sensor_poke_interval_seconds: 60
 ecobici_sensor_timeout_seconds: 900
 
-dbt_selector: fct_ecobici_station_hourly
+dbt_selector: stg_silver_ecobici_state_changes fct_ecobici_station_hourly

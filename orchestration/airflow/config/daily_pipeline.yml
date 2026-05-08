@@ -42,9 +42,10 @@ landing_sensors:
 
 # dbt node selectors for the daily batch (space-separated).
 dbt_daily_selector: >-
+  path:models/staging
   fct_metro_affluence_daily
   fct_ecobici_station_hourly
-  fct_metrobus_stop_events_daily
+  fct_metrobus_stop_events
   dim_date
   dim_station
   dim_weather_condition
