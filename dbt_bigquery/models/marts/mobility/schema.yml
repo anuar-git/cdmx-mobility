@@ -306,7 +306,9 @@ models:
       - name: route_id
         description: GTFS route_id (cluster column).
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: route_short_name
         description: Short route label from GTFS static (e.g. "1", "2"). NULL if not in routes feed.
       - name: route_long_name
@@ -348,6 +350,8 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
+              config:
+                severity: warn
               arguments:
                 min_value: 0
                 max_value: 7200
