@@ -4,6 +4,10 @@ variable "service_account_email" { type = string }
 variable "image" { type = string }
 variable "raw_bucket_name" { type = string }
 variable "gbfs_base_url" { type = string }
+variable "domain" {
+  type        = string
+  description = "Public domain for the dashboard (e.g. mobility.anuarhage.com). Used for CORS on the pipeline-api."
+}
 
 variable "metrobus_inbound_webhook_secret" {
   type      = string
@@ -20,10 +24,10 @@ variable "pipeline_api_image" {
   default     = ""
 }
 
-variable "dashboard_origin" {
+variable "dashboard_image" {
   type        = string
-  description = "Allowed CORS origin for the pipeline API (e.g. https://pipeline.yourdomain.com)."
-  default     = "http://localhost:3000"
+  description = "Full image URI for the Next.js dashboard container."
+  default     = ""
 }
 
 resource "google_artifact_registry_repository" "ingestor" {
@@ -270,16 +274,16 @@ resource "google_cloud_run_v2_service_iam_member" "inbound_public" {
 }
 
 
-# ── Pipeline Health API ───────────────────────────────────────────────────────
-# Separate Cloud Run service that exposes /api/pipeline/* endpoints backed
-# by meta_cdmx and marts_cdmx BigQuery tables. Authentication is via IAM
-# invoker — the dashboard passes an OIDC identity token.
+# ── Pipeline API ──────────────────────────────────────────────────────────────
+# Public read-only analytics API. Ingress locked to the load balancer so
+# Cloud Armor rate-limiting is always enforced — the direct Cloud Run URL
+# is unreachable from the internet.
 resource "google_cloud_run_v2_service" "pipeline_api" {
   count               = var.pipeline_api_image != "" ? 1 : 0
   name                = "pipeline-api"
   location            = var.region
   project             = var.project_id
-  ingress             = "INGRESS_TRAFFIC_ALL"
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
   deletion_protection = false
 
   template {
@@ -298,9 +302,11 @@ resource "google_cloud_run_v2_service" "pipeline_api" {
         value = var.project_id
       }
 
+      # Same-origin in production (LB routes /api/* to this service).
+      # localhost:3000 is kept for local dev.
       env {
         name  = "CORS_ORIGINS"
-        value = var.dashboard_origin
+        value = "https://${var.domain},http://localhost:3000"
       }
 
       resources {
@@ -314,19 +320,71 @@ resource "google_cloud_run_v2_service" "pipeline_api" {
   }
 }
 
-# Require authentication — only callers with roles/run.invoker can call this.
-# The dashboard's service account (or the user's identity via IAP) must have this role.
-resource "google_cloud_run_v2_service_iam_member" "pipeline_api_invoker" {
+resource "google_cloud_run_v2_service_iam_member" "pipeline_api_public" {
   count    = var.pipeline_api_image != "" ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.pipeline_api[0].name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${var.service_account_email}"
+  member   = "allUsers"
 }
 
-output "pipeline_api_url" {
-  value = length(google_cloud_run_v2_service.pipeline_api) > 0 ? google_cloud_run_v2_service.pipeline_api[0].uri : ""
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+# Next.js standalone server. Ingress locked to the load balancer; Cloud Armor
+# rate-limiting covers all dashboard traffic at the LB layer.
+resource "google_cloud_run_v2_service" "dashboard" {
+  count               = var.dashboard_image != "" ? 1 : 0
+  name                = "dashboard"
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  deletion_protection = false
+
+  template {
+    service_account = var.service_account_email
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+
+    containers {
+      image = var.dashboard_image
+
+      env {
+        name  = "NODE_ENV"
+        value = "production"
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+    }
+  }
+}
+
+resource "google_cloud_run_v2_service_iam_member" "dashboard_public" {
+  count    = var.dashboard_image != "" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.dashboard[0].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+output "pipeline_api_service_name" {
+  value = length(google_cloud_run_v2_service.pipeline_api) > 0 ? google_cloud_run_v2_service.pipeline_api[0].name : ""
+}
+
+output "dashboard_service_name" {
+  value = length(google_cloud_run_v2_service.dashboard) > 0 ? google_cloud_run_v2_service.dashboard[0].name : ""
 }
 
 output "job_name" {

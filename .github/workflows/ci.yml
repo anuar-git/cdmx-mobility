@@ -241,6 +241,19 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 
+      - name: Build and push dashboard image
+        env:
+          IMAGE: us-central1-docker.pkg.dev/cdmx-mobility-prod/ingestor/dashboard
+        run: |
+          docker build -f dashboard/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=https://mobility.anuarhage.com \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }} \
+            -t "$IMAGE:${{ github.sha }}" \
+            -t "$IMAGE:latest" \
+            dashboard/
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
   dashboard-typecheck:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
@@ -267,7 +280,8 @@ jobs:
       - name: Build (generates types, type-checks, validates all pages)
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:8080
+          NEXT_PUBLIC_API_URL: https://mobility.anuarhage.com
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
 
   dbt-docs:
     runs-on: ubuntu-latest

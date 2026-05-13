@@ -1,19 +1,10 @@
 """CDMX Mobility API — FastAPI service querying meta_cdmx and marts_cdmx.
 
-Deployed as a Cloud Run service (pipeline-api). Authentication is handled
-by Cloud Run's IAM invoker binding — the dashboard calls this service with
-an Identity Token obtained from the GCP metadata server (or a service account
-key for local dev).
+Deployed as a Cloud Run service (pipeline-api) behind a global HTTPS load
+balancer. Cloud Armor rate-limits at 60 req/min per IP.
 
 Endpoints:
   GET /health                              — liveness probe
-
-  Pipeline health (Phase 5):
-  GET /api/pipeline/health?days=30         — dim_pipeline_health time series
-  GET /api/pipeline/freshness             — latest freshness check per source
-  GET /api/pipeline/tests?days=30         — dbt test pass rate time series
-  GET /api/pipeline/runtime?days=30       — dbt runtime per run
-  GET /api/pipeline/ingestion?days=30     — ingestion row counts per source
 
   Analytical dashboards (Phase 6):
   GET /api/pulse/ridership?days=8         — daily ridership per mode
@@ -42,7 +33,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.equity import router as equity_router
 from routers.modal import router as modal_router
-from routers.pipeline import router as pipeline_router
 from routers.pulse import router as pulse_router
 from routers.station import router as station_router
 
@@ -62,7 +52,6 @@ app.add_middleware(
     allow_headers=["Authorization"],
 )
 
-app.include_router(pipeline_router)
 app.include_router(pulse_router)
 app.include_router(station_router)
 app.include_router(modal_router)

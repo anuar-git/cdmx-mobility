@@ -162,6 +162,12 @@ export interface CorridorRow {
   lon: number;
   line_label: string | null;
   distance_m: number | null;
+  metro_daily_entries: number | null;
+  metro_latest_date: string | null;
+  ecobici_bikes_available: number | null;
+  ecobici_availability_pct: number | null;
+  metrobus_avg_headway_min: number | null;
+  metrobus_routes: string | null;
 }
 
 // ─── Equity & access ──────────────────────────────────────────────────────────

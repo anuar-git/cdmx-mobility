@@ -9,7 +9,6 @@ const LINKS = [
   { href: "/station", label: "Station" },
   { href: "/modal", label: "Modal" },
   { href: "/equity", label: "Equity" },
-  { href: "/pipeline", label: "Pipeline" },
 ];
 
 export function Nav() {

@@ -40,6 +40,9 @@ module "cloudrun" {
   gbfs_base_url                      = var.ecobici_gbfs_base_url
   metrobus_inbound_webhook_secret    = var.metrobus_inbound_webhook_secret
   metrobus_sinoptico_recipient_email = var.metrobus_sinoptico_recipient_email
+  pipeline_api_image                 = var.pipeline_api_image
+  dashboard_image                    = var.dashboard_image
+  domain                             = var.domain
 }
 
 module "scheduler" {
@@ -60,4 +63,18 @@ module "airflow_vm" {
   region     = var.region
   zone       = "${var.region}-a"
   repo_url   = "https://github.com/anuar-git/cdmx-mobility.git"
+}
+
+module "loadbalancer" {
+  source                    = "./modules/loadbalancer"
+  project_id                = var.project_id
+  region                    = var.region
+  domain                    = var.domain
+  dashboard_service_name    = module.cloudrun.dashboard_service_name
+  pipeline_api_service_name = module.cloudrun.pipeline_api_service_name
+}
+
+output "lb_ip" {
+  value       = module.loadbalancer.lb_ip
+  description = "Point your DNS A record at this IP."
 }

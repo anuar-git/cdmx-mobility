@@ -4,7 +4,7 @@ import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
   title: "CDMX Mobility",
-  description: "Mexico City mobility analytics — pulse, station, modal, equity, pipeline.",
+  description: "Mexico City mobility analytics — pulse, station, modal, equity.",
 };
 
 export default function RootLayout({

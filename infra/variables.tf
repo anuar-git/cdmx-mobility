@@ -47,3 +47,21 @@ variable "metrobus_sinoptico_recipient_email" {
   description = "Email address sinopticoplus will send GTFS data to (e.g. gtfs@inbound.anuarhage.com)"
   default     = ""
 }
+
+variable "pipeline_api_image" {
+  type        = string
+  description = "Container image URI for the pipeline-api Cloud Run service"
+  default     = ""
+}
+
+variable "dashboard_image" {
+  type        = string
+  description = "Container image URI for the Next.js dashboard Cloud Run service"
+  default     = ""
+}
+
+variable "domain" {
+  type        = string
+  description = "Public domain for the dashboard (e.g. mobility.anuarhage.com)"
+  default     = "mobility.anuarhage.com"
+}

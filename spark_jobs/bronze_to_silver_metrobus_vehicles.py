@@ -64,6 +64,9 @@ from pyspark.sql.functions import (
     lag,
     lit,
     regexp_extract,
+    regexp_replace,
+    row_number,
+    trim,
     unix_timestamp,
     when,
 )
@@ -165,9 +168,18 @@ def _load_stops(spark: SparkSession, input_path: str) -> DataFrame:
             col("stop_lat").cast(DoubleType()).alias("stop_lat"),
             col("stop_lon").cast(DoubleType()).alias("stop_lon"),
         )
+        # Normalize: strip trailing dots and surrounding whitespace introduced
+        # by inconsistent GTFS data ("Necaxa." / "Garrido." alongside "Necaxa" /
+        # "Garrido"). The regexp removes one or more trailing dots before trim.
+        .withColumn("stop_name", trim(regexp_replace(col("stop_name"), r"\.+$", "")))
     )
 
-    return latest.withColumn("stop_h3", lat_lon_to_h3_udf(col("stop_lat"), col("stop_lon")))
+    latest = latest.withColumn("stop_h3", lat_lon_to_h3_udf(col("stop_lat"), col("stop_lon")))
+
+    # Deduplicate stops that share the same normalized name and H3 cell.
+    # Keeps the lexicographically first stop_id so the choice is deterministic.
+    w_dedup = Window.partitionBy("stop_name", "stop_h3").orderBy("stop_id")
+    return latest.withColumn("_rn", row_number().over(w_dedup)).filter(col("_rn") == 1).drop("_rn")
 
 
 def _compute_dwell_events(snapped: DataFrame) -> DataFrame:

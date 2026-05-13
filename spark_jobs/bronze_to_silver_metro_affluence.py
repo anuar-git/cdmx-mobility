@@ -42,7 +42,7 @@ Outputs
 import click
 from google.cloud import storage as gcs
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, to_date, udf
+from pyspark.sql.functions import col, regexp_replace, to_date, udf
 from pyspark.sql.types import IntegerType, StringType
 
 from ingestion.bq_logger import IngestionLogger, RunResult
@@ -102,8 +102,12 @@ def _transform(spark: SparkSession, input_path: str) -> DataFrame:
     # 2. Fix double-encoded UTF-8 on every text column that may contain accents.
     #    linea  → e.g. "LÃ­nea 1"   → "Línea 1"
     #    estacion → e.g. "PantitlÃ¡n" → "Pantitlán"
-    fixed = raw.withColumn("linea", _fix_encoding_udf(col("linea"))).withColumn(
-        "estacion", _fix_encoding_udf(col("estacion"))
+    fixed = (
+        raw.withColumn("linea", _fix_encoding_udf(col("linea")))
+        .withColumn("estacion", _fix_encoding_udf(col("estacion")))
+        # Some source rows already have plain-ASCII "Linea" (no mojibake to fix).
+        # Normalise to the accented form so all vintages are consistent.
+        .withColumn("linea", regexp_replace(col("linea"), r"^Linea ", "Línea "))
     )
 
     # 3. Canonicalize station names.

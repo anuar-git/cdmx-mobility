@@ -195,7 +195,7 @@ export default function PulsePage() {
                     >
                       <td className="px-4 py-2.5 text-slate-200">{s.station_name}</td>
                       <td className="px-4 py-2.5 text-right text-red-400 font-mono">
-                        {s.stockout_minutes}
+                        {Math.round(s.stockout_minutes)}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono text-slate-300">
                         {s.daily_trips.toLocaleString()}
