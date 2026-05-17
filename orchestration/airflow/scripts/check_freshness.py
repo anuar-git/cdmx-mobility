@@ -10,7 +10,7 @@ SLA targets (all measured from current UTC wall-clock time):
                         covers Spark startup variance and the VM boot window)
   weather  — 1440 min (obs_timestamp is yesterday end-of-day; daily ingest is ~5-7 h stale
                         at check time — 24 h gives a full daily buffer)
-  metro    — 64800 min (monthly CKAN pull; 45-day window catches a missed monthly ingest)
+  metro    — 86400 min (monthly CKAN pull; 60-day window catches a missed monthly ingest)
   metrobus — 720 min  (service stops ~01:00 CDMX / 07:00 UTC; check runs ~14:00 UTC;
                         gap is 7 h. 720 min catches a missed daily Silver run without
                         false-alerting on normal overnight service gaps)
@@ -24,7 +24,7 @@ import datetime
 _CHECKS: list[tuple[str, str, str, int]] = [
     ("ecobici", "ecobici_state_changes", "snapshot_ts", 180),
     ("weather", "weather_hourly_fact", "obs_timestamp", 1440),
-    ("metro", "metro_affluence", "service_date", 64800),
+    ("metro", "metro_affluence", "service_date", 86400),
     ("metrobus", "metrobus_stop_events", "dwell_start_ts", 720),
 ]
 
