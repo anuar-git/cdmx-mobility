@@ -241,7 +241,7 @@ def daily_mobility_pipeline() -> None:
 
         upload_dbt_artifacts(project_id=_PROJECT, run_date=run_date)
 
-    @task(task_id="check_freshness_slas", sla=_SLA)
+    @task(task_id="check_freshness_slas", sla=_SLA, retries=0)
     def check_freshness_task(**_: dict) -> None:
         from check_freshness import check_freshness_slas
 
