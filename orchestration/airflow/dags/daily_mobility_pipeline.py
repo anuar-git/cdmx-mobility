@@ -242,10 +242,10 @@ def daily_mobility_pipeline() -> None:
         upload_dbt_artifacts(project_id=_PROJECT, run_date=run_date)
 
     @task(task_id="check_freshness_slas", sla=_SLA, retries=0)
-    def check_freshness_task(**_: dict) -> None:
+    def check_freshness_task(execution_date: str, **_: dict) -> None:
         from check_freshness import check_freshness_slas
 
-        check_freshness_slas(project_id=_PROJECT)
+        check_freshness_slas(project_id=_PROJECT, execution_date_str=execution_date)
 
     # ── 7. SUCCESS NOTIFICATION ───────────────────────────────────────────────
     @task
@@ -266,7 +266,7 @@ def daily_mobility_pipeline() -> None:
     spark = spark_group()
     gx = gx_validate_silver(run_date="{{ ds }}")
     artifacts = upload_dbt_artifacts_task(run_date="{{ ds }}")
-    freshness = check_freshness_task()
+    freshness = check_freshness_task(execution_date="{{ data_interval_start.isoformat() }}")
     success = notify_success()
 
     ingest >> sensors >> spark >> gx >> dbt_build >> artifacts >> dbt_test >> freshness >> success

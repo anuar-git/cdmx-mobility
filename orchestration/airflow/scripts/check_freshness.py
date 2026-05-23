@@ -1,19 +1,24 @@
 """Check Silver-layer freshness against per-source SLA thresholds.
 
-Queries the max timestamp in each Silver table, computes lag vs. now(),
-writes one row per source to meta_cdmx.freshness_sla_log, then raises
-AirflowException if any SLA is violated so the on_failure_callback fires
-the Slack alert.
+Queries the max timestamp in each Silver table, computes lag vs. a capped
+reference time, writes one row per source to meta_cdmx.freshness_sla_log,
+then raises RuntimeError if any SLA is violated so the on_failure_callback
+fires the Slack alert.
 
-SLA targets (all measured from current UTC wall-clock time):
-  ecobici  — 180 min  (Silver refreshed hourly while VM is up 07:30-15:30 UTC; 180 min
-                        covers Spark startup variance and the VM boot window)
-  weather  — 1440 min (obs_timestamp is yesterday end-of-day; daily ingest is ~5-7 h stale
-                        at check time — 24 h gives a full daily buffer)
-  metro    — 86400 min (monthly CKAN pull; 60-day window catches a missed monthly ingest)
-  metrobus — 720 min  (service stops ~01:00 CDMX / 07:00 UTC; check runs ~14:00 UTC;
-                        gap is 7 h. 720 min catches a missed daily Silver run without
-                        false-alerting on normal overnight service gaps)
+Reference time: min(utcnow(), execution_date + _PIPELINE_MAX_HOURS).
+Capping prevents false positives when a DAG run retries or executes hours
+after its scheduled time — the SLAs measure freshness at expected completion,
+not at wall-clock retry time.
+
+SLA targets:
+  ecobici  — 180 min  (Silver refreshed hourly; 180 min covers Spark startup
+                        variance and the VM boot window)
+  weather  — 1440 min (obs_timestamp is yesterday end-of-day; ~15 h stale at
+                        expected completion — 24 h gives a full daily buffer)
+  metro    — 86400 min (monthly CKAN pull; 60-day window catches a missed
+                        monthly ingest)
+  metrobus — 720 min  (service stops ~01:00 CDMX / 07:00 UTC; check runs
+                        ~14:00 UTC; 720 min catches a missed Silver run)
 """
 
 from __future__ import annotations
@@ -28,12 +33,33 @@ _CHECKS: list[tuple[str, str, str, int]] = [
     ("metrobus", "metrobus_stop_events", "dwell_start_ts", 720),
 ]
 
+# Max expected hours from execution_date to pipeline completion.
+# Capping the reference time here prevents a 24h-delayed retry from
+# reporting 24h of extra staleness on data that was actually fresh.
+_PIPELINE_MAX_HOURS = 10
 
-def check_freshness_slas(project_id: str, **_: object) -> None:
+
+def check_freshness_slas(
+    project_id: str,
+    execution_date_str: str | None = None,
+    **_: object,
+) -> None:
     from google.cloud import bigquery
 
     bq = bigquery.Client(project=project_id)
     now_utc = datetime.datetime.utcnow().replace(tzinfo=datetime.UTC)
+
+    if execution_date_str:
+        execution_date = datetime.datetime.fromisoformat(execution_date_str)
+        if execution_date.tzinfo is None:
+            execution_date = execution_date.replace(tzinfo=datetime.UTC)
+        reference_time = min(
+            now_utc,
+            execution_date + datetime.timedelta(hours=_PIPELINE_MAX_HOURS),
+        )
+    else:
+        reference_time = now_utc
+
     checked_at = now_utc.isoformat()
 
     rows: list[dict] = []
@@ -61,7 +87,7 @@ def check_freshness_slas(project_id: str, **_: object) -> None:
             elif latest_ts.tzinfo is None:
                 latest_ts = latest_ts.replace(tzinfo=datetime.UTC)
 
-            lag_minutes = round((now_utc - latest_ts).total_seconds() / 60, 2)
+            lag_minutes = max(0.0, round((reference_time - latest_ts).total_seconds() / 60, 2))
             is_violated = lag_minutes > sla_minutes
 
         rows.append(
