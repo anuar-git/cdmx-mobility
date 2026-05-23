@@ -17,12 +17,14 @@ interface Props {
   geojson: { type: string; features: GeoFeature[] };
   boroughs: BoroughSummary[];
   height?: number;
+  minScore?: number;
+  maxScore?: number;
 }
 
 type RGBA = [number, number, number, number];
 
-function scoreColor(score: number): RGBA {
-  const t = Math.max(0, Math.min(1, score / 100));
+function scoreColor(score: number, min: number, max: number): RGBA {
+  const t = max > min ? Math.max(0, Math.min(1, (score - min) / (max - min))) : 0.5;
   return [
     Math.round(200 - t * 160),
     Math.round(40 + t * 160),
@@ -31,7 +33,7 @@ function scoreColor(score: number): RGBA {
   ];
 }
 
-export default function EquityMap({ geojson, boroughs, height = 480 }: Props) {
+export default function EquityMap({ geojson, boroughs, height = 480, minScore = 0, maxScore = 100 }: Props) {
   const scoreMap = new Map(boroughs.map((b) => [b.borough, b.avg_score]));
 
   const enriched = {
@@ -51,7 +53,7 @@ export default function EquityMap({ geojson, boroughs, height = 480 }: Props) {
     data: enriched as any,
     filled: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getFillColor: (f: any) => scoreColor(f.properties?.avg_score ?? 0),
+    getFillColor: (f: any) => scoreColor(f.properties?.avg_score ?? 0, minScore, maxScore),
     stroked: true,
     getLineColor: [255, 255, 255, 120],
     lineWidthMinPixels: 1,

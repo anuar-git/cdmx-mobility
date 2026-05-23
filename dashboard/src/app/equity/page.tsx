@@ -36,8 +36,8 @@ interface GeoJSON {
   features: GeoFeature[];
 }
 
-function scoreGradient(score: number): string {
-  const t = score / 100;
+function scoreGradient(score: number, min: number, max: number): string {
+  const t = max > min ? (score - min) / (max - min) : 0.5;
   const r = Math.round(200 - t * 160);
   const g = Math.round(40 + t * 160);
   return `rgb(${r},${g},80)`;
@@ -123,6 +123,9 @@ export default function EquityPage() {
       .catch(console.error);
   }, [geojson, scores, stockout]);
 
+  const maxScore = boroughs.length ? Math.max(...boroughs.map((b) => b.avg_score)) : 1;
+  const minScore = boroughs.length ? Math.min(...boroughs.map((b) => b.avg_score)) : 0;
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -150,7 +153,7 @@ export default function EquityPage() {
           </p>
           <div className="rounded-xl overflow-hidden">
             {geojson && boroughs.length > 0 ? (
-              <EquityMap geojson={geojson} boroughs={boroughs} height={480} />
+              <EquityMap geojson={geojson} boroughs={boroughs} height={480} minScore={minScore} maxScore={maxScore} />
             ) : (
               <div className="h-[480px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">
                 {geojson ? "Computing borough scores…" : "Loading map…"}
@@ -175,8 +178,9 @@ export default function EquityPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
                   <XAxis
                     type="number"
-                    domain={[0, 100]}
+                    domain={[0, maxScore]}
                     tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    tickFormatter={(v: number) => v.toFixed(1)}
                   />
                   <YAxis
                     type="category"
@@ -191,7 +195,7 @@ export default function EquityPage() {
                   />
                   <Bar dataKey="avg_score" name="Score" radius={[0, 3, 3, 0]}>
                     {boroughs.map((b) => (
-                      <Cell key={b.borough} fill={scoreGradient(b.avg_score)} />
+                      <Cell key={b.borough} fill={scoreGradient(b.avg_score, minScore, maxScore)} />
                     ))}
                   </Bar>
                 </BarChart>
