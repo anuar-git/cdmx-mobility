@@ -1,5 +1,6 @@
 # CDMX Mobility Pipeline
 <img width="800" height="436" alt="CDMX-mobility_x2" src="https://github.com/user-attachments/assets/a8969675-1b57-4395-b77a-30bbc81f37a9" />
+
 A data pipeline containing continuously updated mobility data across Mexico City's public transportation network (Metro, Metrobus, Ecobici).
 
 **Link to project:** https://mobility.anuarhage.com
